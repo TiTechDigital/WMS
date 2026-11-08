@@ -80,7 +80,7 @@ export function DateRangePicker({ value, onChange, className, align = "end" }: {
               <Input id="dr-to" type="date" value={to} max={today} onChange={(e) => setTo(e.target.value)} />
             </div>
           </div>
-          {invalid && <p className="mt-2 text-2xs text-danger">Start date must be before end date.</p>}
+          {invalid && <p className="mt-2 text-2xs text-danger-text">Start date must be before end date.</p>}
           <Button
             className="mt-3 w-full"
             size="sm"

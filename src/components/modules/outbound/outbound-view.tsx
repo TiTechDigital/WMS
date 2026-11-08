@@ -17,6 +17,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { OrderDrawer } from "../orders/order-drawer";
 import { ORDER_NEXT_ACTION, orderTotals } from "../orders/order-shared";
 import { useInitialParam } from "@/hooks/use-query-flag";
+import { useConfirm } from "@/components/shared/confirm-dialog";
 import { ORDER_STATUS, PRIORITY } from "@/lib/status";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { REFERENCE_NOW } from "@/lib/constants";
@@ -33,6 +34,7 @@ export function OutboundView() {
   const priorityParam = useInitialParam("priority");
   const [openId, setOpenId] = React.useState<string | null>(null);
   const [stage, setStage] = React.useState<string | null>(null);
+  const { confirm, dialog } = useConfirm();
 
   const dayAgo = new Date(REFERENCE_NOW.getTime() - 86400000).toISOString();
   const active = React.useMemo<Row[]>(
@@ -58,12 +60,29 @@ export function OutboundView() {
   const releaseWave = () => {
     const n = active.filter((o) => o.status === "new");
     if (!n.length) return toast.info("No new orders to release");
+    confirm({
+      title: `Release ${n.length} order${n.length === 1 ? "" : "s"} to picking?`,
+      description: `Each order is allocated and a pick task is created in the Picking console. ${n.filter((o) => o.priority === "urgent").length} urgent.`,
+      items: n.map((o) => `${o.id} · ${o.customerName}`),
+      confirmLabel: `Release ${n.length} orders`,
+      onConfirm: () => doReleaseWave(n),
+    });
+  };
+  const doReleaseWave = (n: Row[]) => {
     n.forEach((o) => actions.advanceOrder(o.id));
     actions.log({ module: "Picking", action: "Wave released", entity: `W-${REFERENCE_NOW.toISOString().slice(5, 10).replace("-", "")}-${String(n.length).padStart(2, "0")}`, details: `${n.length} orders allocated to pick tasks`, severity: "info" });
     toast.success(`Wave released · ${n.length} orders allocated`, { description: "Pick tasks created in the Picking console" });
   };
 
-  const closeManifest = (carrier: string, list: Row[]) => {
+  const closeManifest = (carrier: string, list: Row[]) =>
+    confirm({
+      title: `Close ${carrier} manifest?`,
+      description: `${list.length} shipment${list.length === 1 ? "" : "s"} will be marked as shipped and handed over to ${carrier}. This can't be undone from the WMS.`,
+      items: list.map((o) => `${o.id} · ${o.trackingNumber ?? "label pending"}`),
+      confirmLabel: `Ship ${list.length} with ${carrier}`,
+      onConfirm: () => doCloseManifest(carrier, list),
+    });
+  const doCloseManifest = (carrier: string, list: Row[]) => {
     list.forEach((o) => actions.setOrderStatus(o.id, "shipped"));
     toast.success(`${carrier} manifest closed`, { description: `${list.length} shipment${list.length === 1 ? "" : "s"} handed over` });
   };
@@ -162,7 +181,7 @@ export function OutboundView() {
         return (
           <div>
             <div className="tabular text-xs">{formatDateTime(row.original.requestedShipAt)}</div>
-            <div className={cn("text-2xs", isLate ? "font-medium text-danger" : "text-muted-foreground")}>{isLate ? `Late · ${formatRelative(row.original.requestedShipAt)}` : formatRelative(row.original.requestedShipAt)}</div>
+            <div className={cn("text-2xs", isLate ? "font-medium text-danger-text" : "text-muted-foreground")}>{isLate ? `Late · ${formatRelative(row.original.requestedShipAt)}` : formatRelative(row.original.requestedShipAt)}</div>
           </div>
         );
       },
@@ -187,7 +206,7 @@ export function OutboundView() {
             {ORDER_NEXT_ACTION[row.original.status]} <ArrowRight />
           </Button>
         ) : (
-          <CheckCircle2 className="size-4 text-success" />
+          <CheckCircle2 className="size-4 text-success-text" />
         ),
     },
   ];
@@ -248,6 +267,7 @@ export function OutboundView() {
       </div>
 
       <OrderDrawer id={openId} onOpenChange={(o) => !o && setOpenId(null)} />
+      {dialog}
     </div>
   );
 }
@@ -257,7 +277,7 @@ function MiniProgress({ done, total, active }: { done: number; total: number; ac
   return (
     <div className="w-20">
       <div className="mb-1 flex justify-between text-2xs tabular">
-        <span className={cn(pct === 100 ? "text-success" : active ? "font-medium text-primary" : "text-muted-foreground")}>{pct === 100 ? "Done" : active ? "Active" : pct ? "Partial" : "Pending"}</span>
+        <span className={cn(pct === 100 ? "text-success-text" : active ? "font-medium text-primary" : "text-muted-foreground")}>{pct === 100 ? "Done" : active ? "Active" : pct ? "Partial" : "Pending"}</span>
         <span className="text-muted-foreground">{Math.round(pct)}%</span>
       </div>
       <Progress value={pct} size="xs" tone={pct === 100 ? "success" : "primary"} />

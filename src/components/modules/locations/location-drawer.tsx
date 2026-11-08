@@ -60,7 +60,7 @@ export function LocationDrawer({ location, onOpenChange }: { location: Location 
                   {hierarchy.map(([k, v], i) => (
                     <span key={k} className="flex items-center gap-1">
                       <span className="rounded border bg-subtle px-1.5 py-1">
-                        <span className="block text-[9px] uppercase tracking-wide text-muted-foreground">{k}</span>
+                        <span className="block text-[10px] text-muted-foreground">{k}</span>
                         <span className="font-mono font-medium">{v}</span>
                       </span>
                       {i < hierarchy.length - 1 && <span className="text-muted-foreground">›</span>}

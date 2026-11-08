@@ -278,7 +278,7 @@ function AddSupplierDialog({ open, onOpenChange }: { open: boolean; onOpenChange
                 <SelectContent>{["Net 30", "Net 45", "Net 60", "2/10 Net 30"].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
-            {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger sm:col-span-2">{error}</p>}
+            {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger-text sm:col-span-2">{error}</p>}
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>

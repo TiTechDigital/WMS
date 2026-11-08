@@ -25,6 +25,14 @@ function cellClass(l: Location) {
   return RAMP.find((r) => pct <= r.max && r.max > 0)?.cls ?? RAMP[5].cls;
 }
 
+/** Label color that stays ≥ 4.5:1 on every occupancy shade. */
+function cellText(l: Location) {
+  if (l.status === "blocked") return "text-danger-text";
+  if (l.status === "maintenance") return "text-warning-text";
+  const pct = l.capacity ? (l.occupied / l.capacity) * 100 : 0;
+  return pct > 90 ? "text-white" : "text-foreground";
+}
+
 function Cell({ l, onSelect, highlight, className, children }: { l: Location; onSelect: (l: Location) => void; highlight: Set<string> | null; className?: string; children?: React.ReactNode }) {
   const pct = l.capacity ? Math.round((l.occupied / l.capacity) * 100) : 0;
   const dim = highlight && !highlight.has(l.code);
@@ -76,7 +84,7 @@ function RackZone({ zone, locs, onSelect, highlight }: { zone: Zone; locs: Locat
                 <div key={r} className="flex flex-1 flex-col gap-[3px] rounded-[4px] border border-border/70 bg-surface p-[3px]">
                   {levels.map((lv) => {
                     const l = locs.find((x) => x.aisle === a && x.rack === r && x.shelf === lv);
-                    return l ? <Cell key={lv} l={l} onSelect={onSelect} highlight={highlight} className="h-3 w-full" /> : null;
+                    return l ? <Cell key={lv} l={l} onSelect={onSelect} highlight={highlight} className="h-6 w-full" /> : null;
                   })}
                 </div>
               ))}
@@ -86,7 +94,7 @@ function RackZone({ zone, locs, onSelect, highlight }: { zone: Zone; locs: Locat
         <div className="flex gap-2 pl-9">
           <div className="flex flex-1 gap-1">
             {racks.map((r) => (
-              <span key={r} className="flex-1 text-center font-mono text-[9px] text-muted-foreground">
+              <span key={r} className="flex-1 text-center font-mono text-[10px] text-muted-foreground">
                 R{r}
               </span>
             ))}
@@ -133,7 +141,7 @@ export function WarehouseMap({ locations, zones, onSelect, highlight }: { locati
         <div className="flex flex-1 flex-col gap-1">
           {ls.map((l) => (
             <Cell key={l.id} l={l} onSelect={onSelect} highlight={highlight} className="flex h-7 w-full items-center justify-center">
-              <span className={cn("font-mono text-[9px]", l.occupied / l.capacity > 0.75 ? "text-white" : "text-muted-foreground")}>{l.rack}</span>
+              <span className={cn("font-mono text-[10px]", cellText(l))}>{l.rack}</span>
             </Cell>
           ))}
         </div>
@@ -152,7 +160,7 @@ export function WarehouseMap({ locations, zones, onSelect, highlight }: { locati
               <button
                 onClick={() => onSelect(d)}
                 className={cn(
-                  "flex h-9 flex-1 flex-col items-center justify-center rounded-b-md border border-t-4 text-[9px] transition-colors hover:bg-accent",
+                  "flex h-9 flex-1 flex-col items-center justify-center rounded-b-md border border-t-4 text-[10px] transition-colors hover:bg-accent",
                   d.occupied ? "border-t-primary bg-primary-soft text-primary" : "border-t-border bg-surface text-muted-foreground",
                   highlight && !highlight.has(d.code) && "opacity-20"
                 )}
@@ -181,7 +189,7 @@ export function WarehouseMap({ locations, zones, onSelect, highlight }: { locati
               <div className="flex gap-1.5">
                 {bulk.map((l) => (
                   <Cell key={l.id} l={l} onSelect={onSelect} highlight={highlight} className="flex h-10 flex-1 items-end justify-center pb-1">
-                    <span className={cn("font-mono text-[9px]", l.occupied / l.capacity > 0.75 ? "text-white" : "text-muted-foreground")}>L{l.rack}</span>
+                    <span className={cn("font-mono text-[10px]", cellText(l))}>L{l.rack}</span>
                   </Cell>
                 ))}
               </div>

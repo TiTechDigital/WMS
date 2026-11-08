@@ -3,6 +3,7 @@ import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useFieldControlProps } from "./field-context";
 
 export const Select = SelectPrimitive.Root;
 export const SelectGroup = SelectPrimitive.Group;
@@ -11,7 +12,9 @@ export const SelectValue = SelectPrimitive.Value;
 export const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, ...rest }, ref) => {
+  const props = useFieldControlProps(rest);
+  return (
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
@@ -25,7 +28,8 @@ export const SelectTrigger = React.forwardRef<
       <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
-));
+  );
+});
 SelectTrigger.displayName = "SelectTrigger";
 
 export const SelectContent = React.forwardRef<

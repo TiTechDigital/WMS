@@ -9,7 +9,7 @@
     --subtle: 220 14% 98%;
     --foreground: 221 39% 11%;        /* #111827 */
     --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;   /* #6B7280 */
+    --muted-foreground: 220 9% 40%;   /* ~#5D6370 — ≥4.5:1 on white and on the page background */
     --accent: 220 14% 95%;
     --accent-foreground: 221 39% 11%;
     --border: 220 13% 91%;            /* #E5E7EB */
@@ -20,10 +20,14 @@
     --primary-soft: 214 100% 97%;
     --success: 142 76% 36%;           /* #16A34A */
     --success-soft: 138 76% 96%;
+    --success-text: 143 64% 24%;      /* #166534 — status text on tints */
     --warning: 38 92% 50%;            /* #F59E0B */
     --warning-soft: 48 100% 95%;
+    --warning-text: 26 90% 30%;       /* #92400E-ish */
     --danger: 0 72% 51%;              /* #DC2626 */
     --danger-soft: 0 86% 97%;
+    --danger-text: 0 74% 37%;         /* #A61B1B */
+    --primary-text: 224 76% 40%;      /* #1D40AF */
     --sidebar: 221 39% 11%;           /* #111827 */
     --sidebar-foreground: 220 14% 92%;
     --sidebar-muted: 218 11% 58%;
@@ -38,6 +42,12 @@
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Keep focused elements clear of the sticky 56px top bar (WCAG 2.4.11). */
+    scroll-padding-top: 4.5rem;
+  }
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
   }
   body {
     @apply bg-background text-foreground text-[13px] leading-5;
@@ -77,5 +87,17 @@
   /* Grid children may shrink below their content width (prevents horizontal overflow on small screens). */
   .grid > * {
     min-width: 0;
+  }
+}
+
+/* Respect reduced-motion preferences: keep state changes, drop movement. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

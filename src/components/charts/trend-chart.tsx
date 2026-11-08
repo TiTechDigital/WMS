@@ -26,8 +26,12 @@ export function TrendChart<T extends { date: string }>({
   height?: number;
 }) {
   const id = React.useId().replace(/:/g, "");
+  const values = data.map((d) => Number(d[dataKey]));
+  const summary = values.length
+    ? `${name} trend from ${shortDay(data[0].date)} to ${shortDay(data[data.length - 1].date)}: latest ${format(values[values.length - 1])}, low ${format(Math.min(...values))}, high ${format(Math.max(...values))}.`
+    : "No data";
   return (
-    <div style={{ height }}>
+    <div style={{ height }} role="img" aria-label={summary}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
           <defs>

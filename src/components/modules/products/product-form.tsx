@@ -311,11 +311,11 @@ export function ProductFormDialog({ open, onOpenChange, product }: { open: boole
                 <Field label="Weight (kg)" htmlFor="p-w" required error={errors.weightKg}>
                   <Input id="p-w" type="number" step="0.01" min={0} value={f.weightKg} onChange={(e) => set("weightKg", e.target.value)} />
                 </Field>
-                <Field label="Dimensions L × W × H (cm)" required error={errors.length} hint={cube > 0 ? `${(cube / 1000).toFixed(2)} L · ${(cube / 1e6).toFixed(4)} m³` : undefined} className="sm:col-span-3">
+                <Field label="Dimensions L × W × H (cm)" htmlFor="p-len" required error={errors.length} hint={cube > 0 ? `${(cube / 1000).toFixed(2)} L · ${(cube / 1e6).toFixed(4)} m³` : undefined} className="sm:col-span-3">
                   <div className="grid grid-cols-3 gap-2">
-                    <Input type="number" min={0} placeholder="Length" value={f.length} onChange={(e) => set("length", e.target.value)} aria-label="Length" />
-                    <Input type="number" min={0} placeholder="Width" value={f.width} onChange={(e) => set("width", e.target.value)} aria-label="Width" />
-                    <Input type="number" min={0} placeholder="Height" value={f.height} onChange={(e) => set("height", e.target.value)} aria-label="Height" />
+                    <Input id="p-len" type="number" min={0} placeholder="Length" value={f.length} onChange={(e) => set("length", e.target.value)} aria-label="Length" />
+                    <Input id="p-wid" type="number" min={0} placeholder="Width" value={f.width} onChange={(e) => set("width", e.target.value)} aria-label="Width" />
+                    <Input id="p-hei" type="number" min={0} placeholder="Height" value={f.height} onChange={(e) => set("height", e.target.value)} aria-label="Height" />
                   </div>
                 </Field>
                 <Field label="Storage condition" className="sm:col-span-3">

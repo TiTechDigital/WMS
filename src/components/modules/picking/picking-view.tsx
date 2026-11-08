@@ -106,7 +106,7 @@ export function PickingView() {
                   </TabsList>
                 </Tabs>
                 <div className="flex gap-2">
-                  <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Task, order, picker…" />
+                  <Input type="search" aria-label="Search pick tasks by task, order or picker" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Task, order, picker…" />
                   <Select value={zone} onValueChange={setZone}>
                     <SelectTrigger className="w-28">
                       <SelectValue />

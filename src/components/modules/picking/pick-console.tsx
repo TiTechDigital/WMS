@@ -157,7 +157,7 @@ export function PickConsole({ task }: { task: PickTask }) {
 
       {done ? (
         <div className="flex flex-col items-center px-6 py-14 text-center">
-          <span className="flex size-12 items-center justify-center rounded-full bg-success-soft text-success">
+          <span className="flex size-12 items-center justify-center rounded-full bg-success-soft text-success-text">
             <Check className="size-6" />
           </span>
           <div className="mt-3 text-sm font-semibold">Task complete</div>
@@ -218,10 +218,10 @@ export function PickConsole({ task }: { task: PickTask }) {
             </form>
             <div className="flex flex-wrap gap-1.5 text-2xs text-muted-foreground">
               <span>Simulate scan:</span>
-              <button type="button" className="rounded border px-1.5 font-mono hover:bg-accent" onClick={() => { setScan(line.locationCode); inputRef.current?.focus(); }}>
+              <button type="button" className="rounded border px-2 py-1 font-mono hover:bg-accent" onClick={() => { setScan(line.locationCode); inputRef.current?.focus(); }}>
                 {line.locationCode}
               </button>
-              <button type="button" className="rounded border px-1.5 font-mono hover:bg-accent" onClick={() => { setScan(line.sku); inputRef.current?.focus(); }}>
+              <button type="button" className="rounded border px-2 py-1 font-mono hover:bg-accent" onClick={() => { setScan(line.sku); inputRef.current?.focus(); }}>
                 {line.sku}
               </button>
             </div>

@@ -25,9 +25,12 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useLocalStorage } from "@/hooks/use-local-storage";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FacetFilter, type FacetOption } from "./facet-filter";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -61,6 +64,8 @@ export interface DataTableProps<T> {
   exportName?: string;
   exportRow?: (row: T) => Record<string, string | number>;
   rowClassName?: (row: T) => string | undefined;
+  /** Accessible name for the table (rendered as a visually hidden caption). */
+  caption?: string;
   emptyTitle?: string;
   emptyDescription?: string;
   dense?: boolean;
@@ -86,6 +91,7 @@ export function DataTable<T>({
   exportName,
   exportRow,
   rowClassName,
+  caption,
   emptyTitle = "No matching records",
   emptyDescription = "Try adjusting your search or filters.",
   className,
@@ -95,6 +101,8 @@ export function DataTable<T>({
   const [visibility, setVisibility] = React.useState<VisibilityState>(initialVisibility);
   const [globalFilter, setGlobalFilter] = React.useState(initialSearch);
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+  const [density, setDensity] = useLocalStorage<"comfortable" | "compact">("wms.table.density", "comfortable");
+  const tableName = caption ?? (exportName ? exportName.replace(/-/g, " ").replace(/\bWH [A-Z]{3}\b/, "").trim() : "Records");
 
   React.useEffect(() => setGlobalFilter(initialSearch), [initialSearch]);
 
@@ -165,7 +173,7 @@ export function DataTable<T>({
       <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2.5">
         <div className="relative w-full sm:w-64">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input value={globalFilter} onChange={(e) => setGlobalFilter(e.target.value)} placeholder={searchPlaceholder} className="pl-8 pr-7" />
+          <Input type="search" aria-label={searchPlaceholder.replace(/…$/, "")} value={globalFilter} onChange={(e) => setGlobalFilter(e.target.value)} placeholder={searchPlaceholder} className="pl-8 pr-7 [&::-webkit-search-cancel-button]:hidden" />
           {globalFilter && (
             <button onClick={() => setGlobalFilter("")} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-accent" aria-label="Clear search">
               <X className="size-3" />
@@ -189,7 +197,7 @@ export function DataTable<T>({
             Reset <X />
           </Button>
         )}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
           {toolbar}
           {exportRow && (
             <Button variant="secondary" size="sm" onClick={doExport}>
@@ -198,7 +206,7 @@ export function DataTable<T>({
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="secondary" size="icon-sm" aria-label="Columns">
+              <Button variant="secondary" size="icon-sm" aria-label="Table settings: columns and density">
                 <Settings2 />
               </Button>
             </DropdownMenuTrigger>
@@ -213,6 +221,12 @@ export function DataTable<T>({
                     {(c.columnDef.meta as { label?: string } | undefined)?.label ?? (typeof c.columnDef.header === "string" ? c.columnDef.header : c.id)}
                   </DropdownMenuCheckboxItem>
                 ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Row density</DropdownMenuLabel>
+              <DropdownMenuRadioGroup value={density} onValueChange={(v) => setDensity(v as "comfortable" | "compact")}>
+                <DropdownMenuRadioItem value="comfortable">Comfortable</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="compact">Compact</DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -229,8 +243,13 @@ export function DataTable<T>({
       )}
 
       {/* Table */}
-      <div className="scrollbar-thin overflow-x-auto">
+      <p className="sr-only" aria-live="polite">
+        {filtered.length} {filtered.length === 1 ? "result" : "results"}
+        {selected.length ? `, ${selected.length} selected` : ""}
+      </p>
+      <div className="scrollbar-thin overflow-x-auto" role="region" aria-label={tableName} tabIndex={0}>
         <table className="w-full border-collapse text-[13px]">
+          <caption className="sr-only">{tableName}</caption>
           <thead>
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id} className="border-b bg-subtle">
@@ -241,13 +260,15 @@ export function DataTable<T>({
                   return (
                     <th
                       key={h.id}
+                      scope="col"
+                      aria-sort={canSort ? (sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none") : undefined}
                       style={{ width: h.column.columnDef.size !== 150 ? h.column.columnDef.size : undefined }}
-                      className={cn("h-9 whitespace-nowrap px-3 text-left text-2xs font-semibold uppercase tracking-wide text-muted-foreground", align === "right" && "text-right")}
+                      className={cn("h-9 whitespace-nowrap px-3 text-left text-xs font-medium text-muted-foreground", align === "right" && "text-right")}
                     >
                       {h.isPlaceholder ? null : canSort ? (
                         <button
                           onClick={h.column.getToggleSortingHandler()}
-                          className={cn("inline-flex items-center gap-1 uppercase hover:text-foreground", align === "right" && "flex-row-reverse", sorted && "text-foreground")}
+                          className={cn("-mx-1 inline-flex min-h-7 items-center gap-1 rounded px-1 hover:text-foreground", align === "right" && "flex-row-reverse", sorted && "text-foreground")}
                         >
                           {flexRender(h.column.columnDef.header, h.getContext())}
                           {sorted === "asc" ? <ArrowUp className="size-3" /> : sorted === "desc" ? <ArrowDown className="size-3" /> : <ChevronsUpDown className="size-3 opacity-40" />}
@@ -266,17 +287,28 @@ export function DataTable<T>({
               <tr
                 key={row.id}
                 onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                onKeyDown={
+                  onRowClick
+                    ? (e) => {
+                        if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                          e.preventDefault();
+                          onRowClick(row.original);
+                        }
+                      }
+                    : undefined
+                }
+                tabIndex={onRowClick ? 0 : undefined}
                 data-state={row.getIsSelected() ? "selected" : undefined}
                 className={cn(
                   "border-b transition-colors last:border-0 hover:bg-subtle data-[state=selected]:bg-primary-soft/40",
-                  onRowClick && "cursor-pointer",
+                  onRowClick && "cursor-pointer focus-visible:bg-primary-soft/50 focus-visible:outline-offset-[-2px]",
                   rowClassName?.(row.original)
                 )}
               >
                 {row.getVisibleCells().map((cell) => {
                   const align = (cell.column.columnDef.meta as { align?: string } | undefined)?.align;
                   return (
-                    <td key={cell.id} className={cn("h-11 whitespace-nowrap px-3", align === "right" && "text-right tabular")}>
+                    <td key={cell.id} className={cn("whitespace-nowrap px-3", density === "compact" ? "h-9 py-1" : "h-11", align === "right" && "text-right tabular")}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   );

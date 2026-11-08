@@ -43,7 +43,7 @@ export function KpiCard({
           <span
             className={cn(
               "flex size-6 items-center justify-center rounded",
-              tone === "danger" ? "bg-danger-soft text-danger" : tone === "warning" ? "bg-warning-soft text-[hsl(32_95%_38%)]" : "bg-accent text-muted-foreground"
+              tone === "danger" ? "bg-danger-soft text-danger-text" : tone === "warning" ? "bg-warning-soft text-warning-text" : "bg-accent text-muted-foreground"
             )}
           >
             <Icon className="size-3.5" />
@@ -56,8 +56,9 @@ export function KpiCard({
       </div>
       <div className="mt-1 flex items-center gap-1.5 text-2xs">
         {delta != null && (
-          <span className={cn("inline-flex items-center gap-0.5 font-medium", good ? "text-success" : "text-danger")}>
+          <span className={cn("inline-flex items-center gap-0.5 font-medium", good ? "text-success-text" : "text-danger-text")}>
             {delta >= 0 ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
+            {delta >= 0 ? "+" : "−"}
             {Math.abs(delta).toFixed(1)}%
           </span>
         )}

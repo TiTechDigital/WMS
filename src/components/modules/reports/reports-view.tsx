@@ -184,7 +184,7 @@ export function ReportsView() {
                     <thead className="sticky top-0 bg-subtle">
                       <tr>
                         {Object.keys(preview.data[0] ?? {}).map((h) => (
-                          <th key={h} className="whitespace-nowrap border-b px-3 py-2 text-left text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          <th key={h} scope="col" className="whitespace-nowrap border-b px-3 py-2 text-left text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
                             {h.replace(/_/g, " ")}
                           </th>
                         ))}
@@ -283,7 +283,7 @@ function ScheduleDialog({ report, onOpenChange, onSave }: { report: ReportDef | 
               <Input value={recipients} onChange={(e) => setRecipients(e.target.value)} />
             </Field>
             <p className="rounded-md bg-subtle px-3 py-2 text-2xs text-muted-foreground">First delivery: {firstRun} at {time}</p>
-            {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger">{error}</p>}
+            {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger-text">{error}</p>}
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

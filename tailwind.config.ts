@@ -3,6 +3,8 @@ import animate from "tailwindcss-animate";
 
 const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
+  // Hover styles only on devices that can actually hover (avoids sticky hover on touch).
+  future: { hoverOnlyWhenSupported: true },
   theme: {
     extend: {
       colors: {
@@ -17,6 +19,7 @@ const config: Config = {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
           soft: "hsl(var(--primary-soft))",
+          text: "hsl(var(--primary-text))",
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",
@@ -26,9 +29,9 @@ const config: Config = {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
-        success: { DEFAULT: "hsl(var(--success))", soft: "hsl(var(--success-soft))" },
-        warning: { DEFAULT: "hsl(var(--warning))", soft: "hsl(var(--warning-soft))" },
-        danger: { DEFAULT: "hsl(var(--danger))", soft: "hsl(var(--danger-soft))" },
+        success: { DEFAULT: "hsl(var(--success))", soft: "hsl(var(--success-soft))", text: "hsl(var(--success-text))" },
+        warning: { DEFAULT: "hsl(var(--warning))", soft: "hsl(var(--warning-soft))", text: "hsl(var(--warning-text))" },
+        danger: { DEFAULT: "hsl(var(--danger))", soft: "hsl(var(--danger-soft))", text: "hsl(var(--danger-text))" },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar))",
           foreground: "hsl(var(--sidebar-foreground))",

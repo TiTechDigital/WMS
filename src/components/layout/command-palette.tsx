@@ -126,7 +126,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
             {results.length === 0 && <div className="px-3 py-10 text-center text-sm text-muted-foreground">No results for “{q}”.</div>}
             {Object.entries(groups).map(([group, items]) => (
               <div key={group} className="mb-1">
-                <div className="px-2 pb-1 pt-2 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">{group}</div>
+                <div className="px-2 pb-1 pt-2 text-xs font-medium text-muted-foreground">{group}</div>
                 {items.map(({ r, i }) => {
                   const Icon = r.icon;
                   return (

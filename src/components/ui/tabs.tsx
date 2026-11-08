@@ -16,7 +16,7 @@ export const TabsList = React.forwardRef<
     className={cn(
       "group/tabs inline-flex items-center",
       variant === "underline" && "scrollbar-thin w-full gap-4 overflow-x-auto overflow-y-hidden border-b",
-      variant === "segmented" && "h-8 gap-0.5 rounded-md border bg-accent p-0.5",
+      variant === "segmented" && "h-9 gap-0.5 rounded-md border bg-accent p-0.5",
       className
     )}
     {...props}
@@ -31,7 +31,7 @@ export const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex items-center gap-1.5 whitespace-nowrap text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none disabled:opacity-50 [&_svg]:size-3.5",
+      "inline-flex min-w-6 items-center justify-center gap-1.5 whitespace-nowrap text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none disabled:opacity-50 [&_svg]:size-3.5",
       "group-data-[variant=underline]/tabs:border-b-2 group-data-[variant=underline]/tabs:border-transparent group-data-[variant=underline]/tabs:pb-2.5 group-data-[variant=underline]/tabs:pt-1 group-data-[variant=underline]/tabs:data-[state=active]:border-primary group-data-[variant=underline]/tabs:data-[state=active]:text-foreground",
       "group-data-[variant=segmented]/tabs:h-full group-data-[variant=segmented]/tabs:rounded-[5px] group-data-[variant=segmented]/tabs:px-2.5 group-data-[variant=segmented]/tabs:text-xs group-data-[variant=segmented]/tabs:data-[state=active]:bg-surface group-data-[variant=segmented]/tabs:data-[state=active]:text-foreground group-data-[variant=segmented]/tabs:data-[state=active]:shadow-card",
       className

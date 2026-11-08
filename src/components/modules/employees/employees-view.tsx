@@ -220,7 +220,7 @@ function AddOperatorDialog({ open, onOpenChange }: { open: boolean; onOpenChange
                 <Select value={zone} onValueChange={setZone}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{["Zone A", "Zone B", "Zone C", "Zone D", "Receiving", "Pack Station", "All Zones"].map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent></Select>
               </Field>
             </div>
-            {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger">{error}</p>}
+            {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger-text">{error}</p>}
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowRight, Ban, Check, Plus, Truck } from "lucide-react";
+import { ArrowRight, Ban, Check, MoreHorizontal, Plus, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { useWms, nowIso, CURRENT_USER } from "@/store/wms-store";
 import { PageHeader } from "@/components/shared/page-header";
@@ -17,6 +17,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { Field } from "@/components/shared/form-field";
 import { SkuPicker } from "@/components/shared/sku-picker";
 import { useQueryFlag } from "@/hooks/use-query-flag";
+import { useConfirm } from "@/components/shared/confirm-dialog";
 import { TRANSFER_STATUS } from "@/lib/status";
 import { formatDateTime, formatNumber, formatRelative } from "@/lib/format";
 import { WAREHOUSES } from "@/lib/constants";
@@ -29,6 +30,7 @@ export function TransfersView() {
   const { transfers, warehouse, actions } = useWms();
   const [open, setOpen] = React.useState(false);
   const [presetSku, setPresetSku] = React.useState<string | undefined>();
+  const { confirm, dialog } = useConfirm();
   useQueryFlag("sku", setPresetSku);
   useQueryFlag("new", () => setOpen(true));
 
@@ -95,12 +97,23 @@ export function TransfersView() {
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="icon-sm" variant="ghost" aria-label="More">
-                  ⋯
+                <Button size="icon-sm" variant="ghost" aria-label={`More actions for ${t.id}`}>
+                  <MoreHorizontal />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem destructive onSelect={() => step(t, "cancelled")}>
+                <DropdownMenuItem
+                  destructive
+                  onSelect={() =>
+                    confirm({
+                      title: `Cancel ${t.id}?`,
+                      description: `${t.qty} units of ${t.sku} stay at ${t.fromLocation}. Any operator task for this move is withdrawn.`,
+                      confirmLabel: "Cancel transfer",
+                      tone: "danger",
+                      onConfirm: () => step(t, "cancelled"),
+                    })
+                  }
+                >
                   <Ban /> Cancel transfer
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -157,6 +170,7 @@ export function TransfersView() {
         exportRow={(r) => ({ transfer: r.id, type: r.type, sku: r.sku, from: r.fromLocation, to: r.toLocation, qty: r.qty, reason: r.reason, requested_by: r.requestedBy, status: r.status, created: r.createdAt })}
       />
       <NewTransferDialog open={open} onOpenChange={setOpen} presetSku={presetSku} />
+      {dialog}
     </div>
   );
 }
@@ -308,7 +322,7 @@ function NewTransferDialog({ open, onOpenChange, presetSku }: { open: boolean; o
                 <Textarea id="tr-reason" rows={1} className="min-h-8" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Optional" />
               </Field>
             </div>
-            {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger">{error}</p>}
+            {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger-text">{error}</p>}
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

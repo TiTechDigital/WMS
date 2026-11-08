@@ -6,9 +6,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ProductThumb } from "./product-thumb";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/types";
+import { useFieldControlProps } from "@/components/ui/field-context";
 
 /** Searchable product combobox (by name, SKU or barcode — scanner friendly). */
 export function SkuPicker({ products, value, onChange, placeholder = "Select SKU…", className }: { products: Product[]; value?: string; onChange: (p: Product) => void; placeholder?: string; className?: string }) {
+  const fieldProps = useFieldControlProps({});
   const [open, setOpen] = React.useState(false);
   const [q, setQ] = React.useState("");
   const selected = products.find((p) => p.id === value);
@@ -16,7 +18,7 @@ export function SkuPicker({ products, value, onChange, placeholder = "Select SKU
   return (
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setQ(""); }}>
       <PopoverTrigger asChild>
-        <button type="button" className={cn("flex h-8 w-full items-center gap-2 rounded-md border border-input bg-surface px-2.5 text-left text-[13px] shadow-card", className)}>
+        <button type="button" {...fieldProps} className={cn("flex h-8 w-full items-center gap-2 rounded-md border border-input bg-surface px-2.5 text-left text-[13px] shadow-card", className)}>
           {selected ? (
             <>
               <span className="font-mono text-xs">{selected.sku}</span>

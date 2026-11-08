@@ -18,9 +18,9 @@ export const MODULE_ICON: Record<LogModule, React.ElementType> = {
 
 const SEV_CLS: Record<ActivityEvent["severity"], string> = {
   info: "bg-accent text-muted-foreground",
-  success: "bg-success-soft text-success",
-  warning: "bg-warning-soft text-[hsl(32_95%_38%)]",
-  critical: "bg-danger-soft text-danger",
+  success: "bg-success-soft text-success-text",
+  warning: "bg-warning-soft text-warning-text",
+  critical: "bg-danger-soft text-danger-text",
 };
 
 export function ActivityIcon({ event }: { event: ActivityEvent }) {
@@ -47,7 +47,7 @@ export function ActivityFeed({ events, className }: { events: ActivityEvent[]; c
             <div className="truncate text-xs text-muted-foreground">
               <span className="font-mono text-[11px] text-foreground/80">{e.entity}</span> · {e.details}
             </div>
-            <div className="text-2xs text-muted-foreground/80">
+            <div className="text-2xs text-muted-foreground">
               {e.actor} · {e.source}
             </div>
           </div>
