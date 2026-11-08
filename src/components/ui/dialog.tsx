@@ -4,6 +4,26 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+
+/**
+ * Overlays opened programmatically (e.g. clicking a table row) have no Radix trigger to
+ * return focus to. Remember what had focus when the overlay mounted and restore it on close.
+ */
+function useReturnFocus() {
+  const prev = React.useRef<HTMLElement | null>(null);
+  const capture = React.useCallback(() => {
+    prev.current = document.activeElement as HTMLElement | null;
+  }, []);
+  const restore = React.useCallback((e: Event) => {
+    const el = prev.current;
+    if (el && el !== document.body && document.contains(el)) {
+      e.preventDefault();
+      el.focus();
+    }
+  }, []);
+  return { capture, restore };
+}
+
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogClose = DialogPrimitive.Close;
@@ -26,11 +46,21 @@ DialogOverlay.displayName = "DialogOverlay";
 export const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { size?: "sm" | "md" | "lg" | "xl" }
->(({ className, children, size = "md", ...props }, ref) => (
+>(({ className, children, size = "md", onOpenAutoFocus, onCloseAutoFocus, ...props }, ref) => {
+  const returnFocus = useReturnFocus();
+  return (
   <DialogPrimitive.Portal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
+      onOpenAutoFocus={(e) => {
+        returnFocus.capture();
+        onOpenAutoFocus?.(e);
+      }}
+      onCloseAutoFocus={(e) => {
+        onCloseAutoFocus?.(e);
+        if (!e.defaultPrevented) returnFocus.restore(e);
+      }}
       className={cn(
         "fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border bg-surface shadow-pop duration-150 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-[0.98] data-[state=open]:zoom-in-[0.98]",
         size === "sm" && "max-w-md",
@@ -48,7 +78,8 @@ export const DialogContent = React.forwardRef<
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPrimitive.Portal>
-));
+  );
+});
 DialogContent.displayName = "DialogContent";
 
 export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {

@@ -16,6 +16,7 @@ import { OrderDrawer } from "./order-drawer";
 import { NewOrderDialog } from "./new-order-dialog";
 import { ORDER_NEXT_ACTION, OPEN_STATUSES, orderTotals } from "./order-shared";
 import { useQueryFlag } from "@/hooks/use-query-flag";
+import { useConfirm } from "@/components/shared/confirm-dialog";
 import { ORDER_STATUS, PRIORITY } from "@/lib/status";
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/format";
 import type { Order } from "@/types";
@@ -28,6 +29,7 @@ export function OrdersView() {
   const [newOpen, setNewOpen] = React.useState(false);
   const [tab, setTab] = React.useState<"all" | "open" | "shipped" | "exceptions">("all");
   const [range, setRange] = React.useState<DateRange>(presetRange("14d"));
+  const { confirm, dialog } = useConfirm();
   useQueryFlag("id", setOpenId);
   useQueryFlag("new", () => setNewOpen(true));
 
@@ -142,9 +144,19 @@ export function OrdersView() {
               variant="secondary"
               onClick={() => {
                 const ok = sel.filter((o) => ORDER_NEXT_ACTION[o.status] && o.status !== "on_hold");
-                ok.forEach((o) => actions.advanceOrder(o.id));
-                toast.success(`${ok.length} orders advanced`, { description: sel.length - ok.length ? `${sel.length - ok.length} skipped (closed or on hold)` : undefined });
-                clear();
+                const skipped = sel.length - ok.length;
+                if (!ok.length) return toast.info("None of the selected orders can be advanced", { description: "They are closed or on hold." });
+                confirm({
+                  title: `Advance ${ok.length} order${ok.length === 1 ? "" : "s"} to the next stage?`,
+                  description: `Each order moves one step through fulfillment (e.g. New → Allocated).${skipped ? ` ${skipped} selected order${skipped === 1 ? " is" : "s are"} closed or on hold and will be skipped.` : ""}`,
+                  items: ok.map((o) => `${o.id} · ${ORDER_STATUS[o.status].label} → next`),
+                  confirmLabel: `Advance ${ok.length}`,
+                  onConfirm: () => {
+                    ok.forEach((o) => actions.advanceOrder(o.id));
+                    toast.success(`${ok.length} orders advanced`, { description: skipped ? `${skipped} skipped (closed or on hold)` : undefined });
+                    clear();
+                  },
+                });
               }}
             >
               <ArrowRight /> Advance
@@ -154,9 +166,18 @@ export function OrdersView() {
               variant="secondary"
               onClick={() => {
                 const ok = sel.filter((o) => OPEN_STATUSES.includes(o.status) && o.status !== "on_hold");
-                ok.forEach((o) => actions.setOrderStatus(o.id, "on_hold"));
-                toast.warning(`${ok.length} orders placed on hold`);
-                clear();
+                if (!ok.length) return toast.info("None of the selected orders can be put on hold");
+                confirm({
+                  title: `Put ${ok.length} order${ok.length === 1 ? "" : "s"} on hold?`,
+                  description: "Held orders stop at their current stage and won't be released to picking until the hold is removed.",
+                  items: ok.map((o) => `${o.id} · ${o.customerName}`),
+                  confirmLabel: `Hold ${ok.length}`,
+                  onConfirm: () => {
+                    ok.forEach((o) => actions.setOrderStatus(o.id, "on_hold"));
+                    toast.warning(`${ok.length} orders placed on hold`);
+                    clear();
+                  },
+                });
               }}
             >
               <PauseCircle /> Hold
@@ -169,6 +190,7 @@ export function OrdersView() {
 
       <OrderDrawer id={openId} onOpenChange={(o) => !o && setOpenId(null)} />
       <NewOrderDialog open={newOpen} onOpenChange={setNewOpen} />
+      {dialog}
     </div>
   );
 }

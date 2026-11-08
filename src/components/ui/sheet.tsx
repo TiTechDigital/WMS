@@ -4,6 +4,26 @@ import * as SheetPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+
+/**
+ * Overlays opened programmatically (e.g. clicking a table row) have no Radix trigger to
+ * return focus to. Remember what had focus when the overlay mounted and restore it on close.
+ */
+function useReturnFocus() {
+  const prev = React.useRef<HTMLElement | null>(null);
+  const capture = React.useCallback(() => {
+    prev.current = document.activeElement as HTMLElement | null;
+  }, []);
+  const restore = React.useCallback((e: Event) => {
+    const el = prev.current;
+    if (el && el !== document.body && document.contains(el)) {
+      e.preventDefault();
+      el.focus();
+    }
+  }, []);
+  return { capture, restore };
+}
+
 /** Side drawer built on Radix Dialog. */
 export const Sheet = SheetPrimitive.Root;
 export const SheetTrigger = SheetPrimitive.Trigger;
@@ -12,11 +32,21 @@ export const SheetClose = SheetPrimitive.Close;
 export const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content> & { width?: "md" | "lg" | "xl"; side?: "left" | "right" }
->(({ className, children, width = "lg", side = "right", ...props }, ref) => (
+>(({ className, children, width = "lg", side = "right", onOpenAutoFocus, onCloseAutoFocus, ...props }, ref) => {
+  const returnFocus = useReturnFocus();
+  return (
   <SheetPrimitive.Portal>
     <SheetPrimitive.Overlay className="fixed inset-0 z-50 bg-gray-950/30 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
     <SheetPrimitive.Content
       ref={ref}
+      onOpenAutoFocus={(e) => {
+        returnFocus.capture();
+        onOpenAutoFocus?.(e);
+      }}
+      onCloseAutoFocus={(e) => {
+        onCloseAutoFocus?.(e);
+        if (!e.defaultPrevented) returnFocus.restore(e);
+      }}
       className={cn(
         "fixed inset-y-0 z-50 flex h-full w-full flex-col bg-surface shadow-pop duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out",
         side === "right"
@@ -36,7 +66,8 @@ export const SheetContent = React.forwardRef<
       </SheetPrimitive.Close>
     </SheetPrimitive.Content>
   </SheetPrimitive.Portal>
-));
+  );
+});
 SheetContent.displayName = "SheetContent";
 
 export function SheetHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {

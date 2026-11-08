@@ -97,13 +97,13 @@ export function InboundDrawer({ id, onOpenChange }: { id: string | null; onOpenC
                   <SectionTitle action={editable ? <span className="text-2xs text-primary">Enter counted quantities</span> : undefined}>Lines ({s.lines.length})</SectionTitle>
                   <div className="overflow-hidden rounded-md border">
                     <table className="w-full text-[13px]">
-                      <thead className="bg-subtle text-2xs uppercase tracking-wide text-muted-foreground">
+                      <thead className="bg-subtle text-xs text-muted-foreground">
                         <tr>
-                          <th className="px-3 py-2 text-left font-semibold">SKU</th>
-                          <th className="px-3 py-2 text-right font-semibold">Expected</th>
-                          <th className="px-3 py-2 text-right font-semibold">Received</th>
-                          <th className="px-3 py-2 text-right font-semibold">Damaged</th>
-                          <th className="px-3 py-2 text-right font-semibold">Diff.</th>
+                          <th scope="col" className="px-3 py-2 text-left font-medium">SKU</th>
+                          <th scope="col" className="px-3 py-2 text-right font-medium">Expected</th>
+                          <th scope="col" className="px-3 py-2 text-right font-medium">Received</th>
+                          <th scope="col" className="px-3 py-2 text-right font-medium">Damaged</th>
+                          <th scope="col" className="px-3 py-2 text-right font-medium">Diff.</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -127,10 +127,10 @@ export function InboundDrawer({ id, onOpenChange }: { id: string | null; onOpenC
                                 {editable ? (
                                   <Input type="number" min={0} className="ml-auto h-7 w-16 text-right" value={l.damaged} onChange={(e) => actions.updateInboundLine(s.id, l.sku, l.received, Math.max(0, Number(e.target.value)))} aria-label={`Damaged ${l.sku}`} />
                                 ) : (
-                                  <span className={cn("tabular", l.damaged > 0 && "text-[hsl(32_95%_38%)]")}>{l.damaged}</span>
+                                  <span className={cn("tabular", l.damaged > 0 && "text-warning-text")}>{l.damaged}</span>
                                 )}
                               </td>
-                              <td className={cn("px-3 py-2 text-right font-medium tabular", l.received === 0 ? "text-muted-foreground" : diff < 0 ? "text-danger" : diff > 0 ? "text-[hsl(32_95%_38%)]" : "text-success")}>
+                              <td className={cn("px-3 py-2 text-right font-medium tabular", l.received === 0 ? "text-muted-foreground" : diff < 0 ? "text-danger-text" : diff > 0 ? "text-warning-text" : "text-success-text")}>
                                 {l.received === 0 ? "—" : diff === 0 ? "✓" : diff > 0 ? `+${diff}` : diff}
                               </td>
                             </tr>

@@ -181,7 +181,7 @@ export function ProductsView() {
         />
       ) : (
         <div className="space-y-3">
-          <Input value={gridQuery} onChange={(e) => setGridQuery(e.target.value)} placeholder="Search products…" className="max-w-xs" />
+          <Input type="search" aria-label="Search products" value={gridQuery} onChange={(e) => setGridQuery(e.target.value)} placeholder="Search products…" className="max-w-xs" />
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
             {gridRows.map((p) => (
               <div key={p.id} role="button" tabIndex={0} onClick={() => setViewing(p.id)} onKeyDown={(e) => e.key === "Enter" && setViewing(p.id)} className="group cursor-pointer rounded-lg border bg-surface p-3 shadow-card transition-colors hover:border-primary/30">

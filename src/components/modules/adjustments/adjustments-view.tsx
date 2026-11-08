@@ -19,6 +19,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { Field } from "@/components/shared/form-field";
 import { SkuPicker } from "@/components/shared/sku-picker";
 import { useQueryFlag } from "@/hooks/use-query-flag";
+import { useConfirm } from "@/components/shared/confirm-dialog";
 import { ADJUSTMENT_STATUS } from "@/lib/status";
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ export function AdjustmentsView() {
   const [tab, setTab] = React.useState<"pending" | "all">("all");
   const [open, setOpen] = React.useState(false);
   const [presetSku, setPresetSku] = React.useState<string | undefined>();
+  const { confirm, dialog } = useConfirm();
   useQueryFlag("sku", setPresetSku);
   useQueryFlag("new", () => setOpen(true));
 
@@ -60,9 +62,9 @@ export function AdjustmentsView() {
     },
     { accessorKey: "locationCode", header: "Location", meta: { label: "Location" }, cell: ({ getValue }) => <span className="font-mono text-2xs">{getValue() as string}</span> },
     { id: "beforeAfter", header: "Before → After", meta: { label: "Before → After", align: "right" }, accessorFn: (r) => r.after, cell: ({ row }) => <span className="tabular text-muted-foreground">{formatNumber(row.original.before)} → <span className="text-foreground">{formatNumber(row.original.after)}</span></span> },
-    { accessorKey: "delta", header: "Change", meta: { align: "right", label: "Change" }, cell: ({ getValue }) => { const d = getValue() as number; return <span className={cn("font-medium tabular", d < 0 ? "text-danger" : "text-success")}>{d > 0 ? "+" : ""}{d}</span>; } },
+    { accessorKey: "delta", header: "Change", meta: { align: "right", label: "Change" }, cell: ({ getValue }) => { const d = getValue() as number; return <span className={cn("font-medium tabular", d < 0 ? "text-danger-text" : "text-success-text")}>{d > 0 ? "+" : ""}{d}</span>; } },
     { accessorKey: "reason", header: "Reason", meta: { label: "Reason" }, filterFn: inArrayFilter, cell: ({ row }) => <div><Badge>{row.original.reason}</Badge>{row.original.note && <div className="mt-0.5 max-w-[200px] truncate text-2xs text-muted-foreground">{row.original.note}</div>}</div> },
-    { accessorKey: "valueImpact", header: "Value", meta: { align: "right", label: "Value impact" }, cell: ({ getValue }) => { const v = getValue() as number; return <span className={cn("tabular", v < 0 ? "text-danger" : "text-success")}>{v > 0 ? "+" : ""}{formatCurrency(v, true)}</span>; } },
+    { accessorKey: "valueImpact", header: "Value", meta: { align: "right", label: "Value impact" }, cell: ({ getValue }) => { const v = getValue() as number; return <span className={cn("tabular", v < 0 ? "text-danger-text" : "text-success-text")}>{v > 0 ? "+" : ""}{formatCurrency(v, true)}</span>; } },
     { accessorKey: "requestedBy", header: "Requested by", meta: { label: "Requested by" } },
     { accessorKey: "createdAt", header: "Date", meta: { label: "Date" }, cell: ({ getValue }) => <span className="tabular text-muted-foreground">{formatDateTime(getValue() as string)}</span> },
     { accessorKey: "status", header: "Status", meta: { label: "Status" }, filterFn: inArrayFilter, cell: ({ row }) => <div><StatusBadge map={ADJUSTMENT_STATUS} value={row.original.status} />{row.original.approvedBy && <div className="mt-0.5 text-2xs text-muted-foreground">by {row.original.approvedBy}</div>}</div> },
@@ -122,7 +124,7 @@ export function AdjustmentsView() {
         <TabsList>
           <TabsTrigger value="all">All adjustments</TabsTrigger>
           <TabsTrigger value="pending">
-            Pending approval {pending.length > 0 && <span className="rounded bg-warning-soft px-1.5 text-2xs text-[hsl(32_95%_38%)]">{pending.length}</span>}
+            Pending approval {pending.length > 0 && <span className="rounded bg-warning-soft px-1.5 text-2xs text-warning-text">{pending.length}</span>}
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -143,10 +145,44 @@ export function AdjustmentsView() {
           const ids = sel.filter((s) => s.status === "pending").map((s) => s.id);
           return (
             <>
-              <Button size="sm" variant="secondary" disabled={!ids.length} onClick={() => { review(ids, "approved"); clear(); }}>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={!ids.length}
+                onClick={() => {
+                  const list = sel.filter((s) => s.status === "pending");
+                  const value = list.reduce((a, r) => a + r.valueImpact, 0);
+                  confirm({
+                    title: `Post ${ids.length} adjustment${ids.length === 1 ? "" : "s"} to inventory?`,
+                    description: `Stock on hand changes immediately. Net value impact ${formatCurrency(value, true)}.`,
+                    items: list.map((r) => `${r.id} · ${r.sku} ${r.delta > 0 ? "+" : ""}${r.delta} at ${r.locationCode}`),
+                    confirmLabel: `Approve & post ${ids.length}`,
+                    onConfirm: () => {
+                      review(ids, "approved");
+                      clear();
+                    },
+                  });
+                }}
+              >
                 <Check /> Approve {ids.length}
               </Button>
-              <Button size="sm" variant="secondary" disabled={!ids.length} onClick={() => { review(ids, "rejected"); clear(); }}>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={!ids.length}
+                onClick={() =>
+                  confirm({
+                    title: `Reject ${ids.length} adjustment${ids.length === 1 ? "" : "s"}?`,
+                    description: "Stock stays unchanged. The requesters see the rejection in the activity log.",
+                    confirmLabel: `Reject ${ids.length}`,
+                    tone: "danger",
+                    onConfirm: () => {
+                      review(ids, "rejected");
+                      clear();
+                    },
+                  })
+                }
+              >
                 <X /> Reject
               </Button>
             </>
@@ -156,6 +192,7 @@ export function AdjustmentsView() {
         exportRow={(r) => ({ id: r.id, sku: r.sku, location: r.locationCode, before: r.before, after: r.after, change: r.delta, reason: r.reason, value: r.valueImpact, requested_by: r.requestedBy, status: r.status, date: r.createdAt })}
       />
       <NewAdjustmentDialog open={open} onOpenChange={setOpen} presetSku={presetSku} />
+      {dialog}
     </div>
   );
 }
@@ -285,7 +322,7 @@ function NewAdjustmentDialog({ open, onOpenChange, presetSku }: { open: boolean;
               </div>
               <Switch id="adj-post" checked={postNow} onCheckedChange={setPostNow} />
             </div>
-            {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger">{error}</p>}
+            {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger-text">{error}</p>}
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

@@ -13,14 +13,18 @@ export const formatPercent = (n: number, digits = 1) => `${n.toFixed(digits)}%`;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** Deterministic (timezone-stable) date formatting — avoids SSR/CSR hydration drift. */
+/**
+ * Deterministic (timezone-stable) date formatting — avoids SSR/CSR hydration drift.
+ * Day-first with month name ("06 Nov 2026") so dates are unambiguous across US/EU sites.
+ * All times are UTC; the top bar states this once for the whole app.
+ */
 export function formatDate(iso: string) {
   const d = new Date(iso);
-  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
+  return `${pad(d.getUTCDate())} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 export function formatShortDate(iso: string) {
   const d = new Date(iso);
-  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+  return `${pad(d.getUTCDate())} ${MONTHS[d.getUTCMonth()]}`;
 }
 export function formatDateTime(iso: string) {
   const d = new Date(iso);

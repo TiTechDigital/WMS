@@ -170,14 +170,14 @@ export function SettingsView() {
             <CardHeader title="Role permissions" description="Default access by job function" />
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
-                <thead className="bg-subtle text-2xs uppercase tracking-wide text-muted-foreground">
-                  <tr><th className="px-4 py-2 text-left font-semibold">Role</th>{PERMS.map((p) => <th key={p} className="px-4 py-2 text-center font-semibold">{p}</th>)}</tr>
+                <thead className="bg-subtle text-xs text-muted-foreground">
+                  <tr><th scope="col" className="px-4 py-2 text-left font-medium">Role</th>{PERMS.map((p) => <th key={p} scope="col" className="px-4 py-2 text-center font-medium">{p}</th>)}</tr>
                 </thead>
                 <tbody>
                   {ROLES.map((r) => (
                     <tr key={r.role} className="border-t">
                       <td className="px-4 py-2.5 font-medium">{r.role}</td>
-                      {r.perms.map((p, i) => <td key={i} className="px-4 py-2.5 text-center">{p ? <Check className="mx-auto size-4 text-success" /> : <span className="text-muted-foreground">—</span>}</td>)}
+                      {r.perms.map((p, i) => <td key={i} className="px-4 py-2.5 text-center">{p ? <Check className="mx-auto size-4 text-success-text" /> : <span className="text-muted-foreground">—</span>}</td>)}
                     </tr>
                   ))}
                 </tbody>
@@ -203,7 +203,7 @@ export function SettingsView() {
           <Card>
             <CardHeader title="Notification preferences" description="Choose how you’re alerted. Changes save automatically." />
             <div className="divide-y">
-              <div className="flex px-4 py-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground"><span className="flex-1">Event</span><span className="w-16 text-center">In-app</span><span className="w-16 text-center">Email</span></div>
+              <div className="flex px-4 py-2 text-xs font-medium text-muted-foreground"><span className="flex-1">Event</span><span className="w-16 text-center">In-app</span><span className="w-16 text-center">Email</span></div>
               {NOTIFS.map(([k, label, desc]) => (
                 <div key={k} className="flex items-center px-4 py-3">
                   <div className="flex-1"><div className="text-[13px] font-medium">{label}</div><div className="text-2xs text-muted-foreground">{desc}</div></div>

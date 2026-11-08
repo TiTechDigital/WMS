@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Lock } from "lucide-react";
 import { Sidebar, SidebarNav, WarehouseSwitcher } from "./sidebar";
 import { Topbar } from "./topbar";
@@ -36,6 +36,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [shortcuts, setShortcuts] = React.useState(false);
   const [locked, setLocked] = React.useState(false);
   const pendingG = React.useRef(false);
+  const pathname = usePathname();
+  const mainRef = React.useRef<HTMLElement>(null);
+  const firstRender = React.useRef(true);
+
+  // Move focus to the page heading after client-side navigation so keyboard and
+  // screen-reader users land at the start of the new page.
+  React.useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    const h1 = mainRef.current?.querySelector("h1");
+    if (h1) {
+      h1.setAttribute("tabindex", "-1");
+      h1.focus({ preventScroll: false });
+    }
+  }, [pathname]);
 
   useHotkey("k", () => setSearchOpen((v) => !v), { meta: true });
   useHotkey("[", () => setCollapsed((v) => !v));
@@ -61,6 +78,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
+      <a
+        href="#main"
+        className="fixed left-3 top-3 z-[70] -translate-y-16 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-white focus:translate-y-0"
+      >
+        Skip to content
+      </a>
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
 
       <Sheet open={mobileNav} onOpenChange={setMobileNav}>
@@ -86,7 +109,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           onOpenShortcuts={() => setShortcuts(true)}
           onSignOut={() => setLocked(true)}
         />
-        <main className="flex-1 px-4 py-5 lg:px-6">{children}</main>
+        <main id="main" ref={mainRef} tabIndex={-1} className="flex-1 px-4 py-5 outline-none lg:px-6 [&_h1:focus]:outline-none">
+          {children}
+        </main>
       </div>
 
       <CommandPalette open={searchOpen} onOpenChange={setSearchOpen} />

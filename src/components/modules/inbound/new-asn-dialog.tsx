@@ -127,10 +127,10 @@ export function NewAsnDialog({ open, onOpenChange, presetSku }: { open: boolean;
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Expected arrival (UTC)" required className="sm:col-span-2">
+              <Field label="Expected arrival (UTC)" htmlFor="asn-date" required className="sm:col-span-2">
                 <div className="grid grid-cols-2 gap-2">
-                  <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Date" />
-                  <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Time" />
+                  <Input id="asn-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Arrival date" />
+                  <Input id="asn-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} aria-label="Arrival time" />
                 </div>
               </Field>
             </div>
@@ -153,7 +153,7 @@ export function NewAsnDialog({ open, onOpenChange, presetSku }: { open: boolean;
                 ))}
               </div>
             </div>
-            {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger">{error}</p>}
+            {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger-text">{error}</p>}
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

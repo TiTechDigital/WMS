@@ -13,8 +13,11 @@ export function StockMovementChart({ data, height = 240 }: { data: Row[]; height
   const min = Math.min(...data.map((d) => d.stockOnHand));
   const max = Math.max(...data.map((d) => d.stockOnHand));
   const pad = (max - min) * 0.25 || 1000;
+  const first = data[0];
+  const last = data[data.length - 1];
+  const summary = first && last ? `Line chart of stock on hand from ${shortDay(first.date)} to ${shortDay(last.date)}: ${formatNumber(first.stockOnHand)} to ${formatNumber(last.stockOnHand)} units, low ${formatNumber(min)}, high ${formatNumber(max)}.` : "No data";
   return (
-    <div style={{ height }}>
+    <div style={{ height }} role="img" aria-label={summary}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
           <defs>
@@ -45,7 +48,7 @@ export function InOutChart({ data, height = 240 }: { data: Row[]; height?: numbe
           { label: "Outbound", color: SERIES[1], value: formatCompact(totals.o) },
         ]}
       />
-      <div style={{ height }}>
+      <div style={{ height }} role="img" aria-label={`Bar chart of inbound and outbound units: ${formatNumber(totals.i)} received and ${formatNumber(totals.o)} shipped over ${data.length} periods.`}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -8 }} barGap={2} barCategoryGap="22%">
             <CartesianGrid {...GRID} />
@@ -63,8 +66,9 @@ export function InOutChart({ data, height = 240 }: { data: Row[]; height?: numbe
 
 export function CategoryDistributionChart({ data, height = 280 }: { data: { category: string; units: number; skus: number }[]; height?: number }) {
   const total = data.reduce((s, d) => s + d.units, 0) || 1;
+  const summary = `Bar chart of units on hand by category: ${data.map((d) => `${d.category} ${formatNumber(d.units)}`).join(", ")}.`;
   return (
-    <div style={{ height }}>
+    <div style={{ height }} role="img" aria-label={summary}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={{ top: 0, right: 44, bottom: 0, left: 0 }} barCategoryGap={6}>
           <XAxis type="number" hide />
@@ -101,8 +105,10 @@ export function CategoryDistributionChart({ data, height = 280 }: { data: { cate
 }
 
 export function FulfillmentChart({ data, height = 160, target = 97 }: { data: Row[]; height?: number; target?: number }) {
+  const avg = data.length ? data.reduce((s, d) => s + d.onTimeRate, 0) / data.length : 0;
+  const below = data.filter((d) => d.onTimeRate < target).length;
   return (
-    <div style={{ height }}>
+    <div style={{ height }} role="img" aria-label={`Line chart of on-time shipping rate: average ${avg.toFixed(1)}%, below the ${target}% target on ${below} of ${data.length} days.`}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
           <CartesianGrid {...GRID} />

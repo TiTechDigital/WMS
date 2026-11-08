@@ -16,12 +16,14 @@ import { formatCurrency, formatDateTime, formatNumber, formatRelative } from "@/
 import { ORDER_STAGES, type Priority } from "@/types";
 import { ORDER_NEXT_ACTION, orderTotals } from "./order-shared";
 import { cn } from "@/lib/utils";
+import { useConfirm } from "@/components/shared/confirm-dialog";
 
 export function OrderDrawer({ id, onOpenChange }: { id: string | null; onOpenChange: (v: boolean) => void }) {
   const { orders, customers, pickTasks, actions } = useWms();
   const o = orders.find((x) => x.id === id);
   const customer = customers.find((c) => c.id === o?.customerId);
   const task = pickTasks.find((t) => t.orderId === id);
+  const { confirm, dialog } = useConfirm();
 
   const advance = () => {
     if (!o) return;
@@ -93,14 +95,14 @@ export function OrderDrawer({ id, onOpenChange }: { id: string | null; onOpenCha
                   <SectionTitle action={task ? <span className="font-mono text-2xs text-muted-foreground">{task.id} · {task.assigneeName ?? "Unassigned"}</span> : undefined}>Lines ({o.lines.length})</SectionTitle>
                   <div className="overflow-hidden rounded-md border">
                     <table className="w-full text-[13px]">
-                      <thead className="bg-subtle text-2xs uppercase tracking-wide text-muted-foreground">
+                      <thead className="bg-subtle text-xs text-muted-foreground">
                         <tr>
-                          <th className="px-3 py-2 text-left font-semibold">Product</th>
-                          <th className="px-3 py-2 text-left font-semibold">Location</th>
-                          <th className="px-3 py-2 text-right font-semibold">Qty</th>
-                          <th className="px-3 py-2 text-right font-semibold">Picked</th>
-                          <th className="px-3 py-2 text-right font-semibold">Packed</th>
-                          <th className="px-3 py-2 text-right font-semibold">Amount</th>
+                          <th scope="col" className="px-3 py-2 text-left font-medium">Product</th>
+                          <th scope="col" className="px-3 py-2 text-left font-medium">Location</th>
+                          <th scope="col" className="px-3 py-2 text-right font-medium">Qty</th>
+                          <th scope="col" className="px-3 py-2 text-right font-medium">Picked</th>
+                          <th scope="col" className="px-3 py-2 text-right font-medium">Packed</th>
+                          <th scope="col" className="px-3 py-2 text-right font-medium">Amount</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -112,8 +114,8 @@ export function OrderDrawer({ id, onOpenChange }: { id: string | null; onOpenCha
                             </td>
                             <td className="px-3 py-2 font-mono text-2xs">{l.locationCode}</td>
                             <td className="px-3 py-2 text-right tabular">{l.quantity}</td>
-                            <td className={cn("px-3 py-2 text-right tabular", l.picked === l.quantity ? "text-success" : "text-muted-foreground")}>{l.picked}</td>
-                            <td className={cn("px-3 py-2 text-right tabular", l.packed === l.quantity ? "text-success" : "text-muted-foreground")}>{l.packed}</td>
+                            <td className={cn("px-3 py-2 text-right tabular", l.picked === l.quantity ? "text-success-text" : "text-muted-foreground")}>{l.picked}</td>
+                            <td className={cn("px-3 py-2 text-right tabular", l.packed === l.quantity ? "text-success-text" : "text-muted-foreground")}>{l.packed}</td>
                             <td className="px-3 py-2 text-right tabular">{formatCurrency(l.quantity * l.unitPrice, true)}</td>
                           </tr>
                         ))}
@@ -181,10 +183,18 @@ export function OrderDrawer({ id, onOpenChange }: { id: string | null; onOpenCha
                       {!closed && (
                         <DropdownMenuItem
                           destructive
-                          onSelect={() => {
-                            actions.setOrderStatus(o.id, "cancelled");
-                            toast.error(`${o.id} cancelled`);
-                          }}
+                          onSelect={() =>
+                            confirm({
+                              title: `Cancel ${o.id}?`,
+                              description: `${o.customerName} · ${o.lines.length} lines. Reserved stock is released and open pick tasks stop. Cancelled orders can't be reopened.`,
+                              confirmLabel: "Cancel order",
+                              tone: "danger",
+                              onConfirm: () => {
+                                actions.setOrderStatus(o.id, "cancelled");
+                                toast.error(`${o.id} cancelled`);
+                              },
+                            })
+                          }
                         >
                           <Ban /> Cancel order
                         </DropdownMenuItem>
@@ -204,6 +214,7 @@ export function OrderDrawer({ id, onOpenChange }: { id: string | null; onOpenCha
           );
         })()}
       </SheetContent>
+      {dialog}
     </Sheet>
   );
 }

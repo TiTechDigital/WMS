@@ -52,5 +52,5 @@ export function bucketMetrics(m: DailyMetric[], maxBars = 31) {
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 export const shortDay = (iso: string) => {
   const [, m, d] = iso.split("-").map(Number);
-  return `${MONTHS[m - 1]} ${d}`;
+  return `${String(d).padStart(2, "0")} ${MONTHS[m - 1]}`;
 };

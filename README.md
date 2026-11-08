@@ -61,3 +61,19 @@ src/
 - **The seed data is deterministic** (seeded PRNG plus a fixed reference time in `lib/constants.ts`), so server and client renders match. When live data arrives, replace `REFERENCE_NOW` with the real clock.
 - **The domain types in `src/types`** map directly to future database tables and API DTOs.
 - **Barcode scanning**: the pick console and command palette already handle keyboard-wedge scanner input (scan then Enter), so hardware scanners work without extra integration.
+
+## Accessibility and UI quality
+
+The UI targets **WCAG 2.2 AA** and is checked with an automated audit (contrast, labels, headings, landmarks, target size, 375px overflow, reduced motion, console errors) on all 17 pages, plus a scripted keyboard walk-through. What's in place:
+
+- **Keyboard:** skip link, focus moves to the page heading after navigation, table rows open with Enter, and focus returns to the row when a drawer closes.
+- **Tables:** caption, column scope, `aria-sort`, search with an accessible name, and live announcements of result and selection counts.
+- **Forms:** the `Field` component links each label, hint and error to its control and sets `aria-invalid` automatically (`src/components/ui/field-context.ts`).
+- **Color:** status text tokens (`*-text`) keep badges at or above 4.5:1. Status is never shown by color alone.
+- **Targets:** at least 24×24px, including checkboxes, switches and floor-plan cells.
+- **Motion and hover:** `prefers-reduced-motion` is respected globally; hover styles apply only on devices that can hover.
+- **Bulk and irreversible actions:** releasing waves, closing manifests, approving adjustments, blocking locations and cancelling all go through a confirmation that previews the affected records (`src/components/shared/confirm-dialog.tsx`).
+- **Dashboard:** leads with a "Needs attention" strip that links to the filtered queues.
+- **Dates:** day-first and unambiguous (`06 Nov 2026`); all times are UTC.
+
+Not yet verified: screen-reader testing on a real assistive technology (VoiceOver, NVDA) and Windows forced-colors mode.

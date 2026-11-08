@@ -16,6 +16,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { WarehouseMap, MapLegend } from "./warehouse-map";
 import { LocationDrawer } from "./location-drawer";
 import { useInitialParam } from "@/hooks/use-query-flag";
+import { useConfirm } from "@/components/shared/confirm-dialog";
 import { LOCATION_STATUS, LOCATION_TYPE_LABEL } from "@/lib/status";
 import { formatDate, formatNumber } from "@/lib/format";
 import type { Location } from "@/types";
@@ -29,6 +30,7 @@ export function LocationsView() {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [mapQuery, setMapQuery] = React.useState("");
   const selected = locations.find((l) => l.id === selectedId) ?? null;
+  const { confirm, dialog } = useConfirm();
 
   const skusByLoc = React.useMemo(() => {
     const m = new Map<string, string[]>();
@@ -124,7 +126,7 @@ export function LocationsView() {
                 actions={
                   <div className="relative w-56">
                     <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                    <Input value={mapQuery} onChange={(e) => setMapQuery(e.target.value)} placeholder="Locate SKU or location…" className="h-7 pl-8 pr-7 text-xs" />
+                    <Input type="search" aria-label="Locate SKU or location on the floor plan" value={mapQuery} onChange={(e) => setMapQuery(e.target.value)} placeholder="Locate SKU or location…" className="h-7 pl-8 pr-7 text-xs" />
                     {mapQuery && (
                       <button onClick={() => setMapQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" aria-label="Clear">
                         <X className="size-3" />
@@ -134,7 +136,11 @@ export function LocationsView() {
                 }
               />
               <CardContent className="space-y-4">
-                <WarehouseMap locations={locations} zones={zones} onSelect={(l) => setSelectedId(l.id)} highlight={highlight} />
+                <div className="scrollbar-thin -mx-1 overflow-x-auto px-1 pb-1" role="region" aria-label="Warehouse floor plan" tabIndex={0}>
+                  <div className="min-w-[640px]">
+                    <WarehouseMap locations={locations} zones={zones} onSelect={(l) => setSelectedId(l.id)} highlight={highlight} />
+                  </div>
+                </div>
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
                   <MapLegend />
                   {highlight && <span className="text-2xs font-medium text-foreground">{highlight.size} matching location{highlight.size === 1 ? "" : "s"}</span>}
@@ -203,9 +209,19 @@ export function LocationsView() {
                   size="sm"
                   variant="secondary"
                   onClick={() => {
-                    sel.forEach((l) => actions.setLocationStatus(l.id, "blocked"));
-                    toast.success(`${sel.length} locations blocked`);
-                    clear();
+                    const withStock = sel.filter((l) => l.occupied > 0).length;
+                    confirm({
+                      title: `Block ${sel.length} location${sel.length === 1 ? "" : "s"}?`,
+                      description: `Blocked locations are excluded from putaway, picking and replenishment.${withStock ? ` ${withStock} still hold stock, which becomes unavailable for orders.` : ""}`,
+                      items: sel.map((l) => l.code),
+                      confirmLabel: `Block ${sel.length}`,
+                      tone: "danger",
+                      onConfirm: () => {
+                        sel.forEach((l) => actions.setLocationStatus(l.id, "blocked"));
+                        toast.success(`${sel.length} locations blocked`);
+                        clear();
+                      },
+                    });
                   }}
                 >
                   <Ban /> Block
@@ -219,6 +235,7 @@ export function LocationsView() {
       </Tabs>
 
       <LocationDrawer location={selected} onOpenChange={(o) => !o && setSelectedId(null)} />
+      {dialog}
     </div>
   );
 }

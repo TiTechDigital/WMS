@@ -69,9 +69,9 @@ export function Topbar({
       </Button>
       <nav className="hidden min-w-0 items-center gap-1.5 text-[13px] md:flex" aria-label="Breadcrumb">
         <span className="text-muted-foreground">{warehouse.name}</span>
-        <ChevronRight className="size-3.5 text-muted-foreground/60" />
+        <ChevronRight className="size-3.5 text-muted-foreground" />
         <span className="text-muted-foreground">{crumbs.section}</span>
-        <ChevronRight className="size-3.5 text-muted-foreground/60" />
+        <ChevronRight className="size-3.5 text-muted-foreground" />
         <span className="truncate font-medium">{crumbs.title}</span>
       </nav>
 
@@ -117,9 +117,9 @@ export function Topbar({
 
         <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
 
-        <div className="hidden items-center gap-1.5 rounded-md px-2 text-2xs text-muted-foreground xl:flex" title="Real-time sync with RF devices">
-          <Wifi className="size-3.5 text-success" />
-          <span>Synced {formatTime(REFERENCE_NOW.toISOString())} UTC</span>
+        <div className="hidden items-center gap-1.5 rounded-md px-2 text-2xs text-muted-foreground xl:flex" title="Real-time sync with RF devices. All times in the app are shown in UTC.">
+          <Wifi className="size-3.5 text-success-text" />
+          <span>Synced {formatTime(REFERENCE_NOW.toISOString())} · times in UTC</span>
         </div>
 
         <Button variant="ghost" size="icon" onClick={onOpenShortcuts} aria-label="Keyboard shortcuts" className="hidden sm:inline-flex">

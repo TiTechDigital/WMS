@@ -80,7 +80,7 @@ export function PackStation() {
           </div>
           <div className="grid gap-6 p-5 xl:grid-cols-[1fr_260px]">
             <div>
-              <div className="mb-2 flex items-center justify-between text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="mb-2 flex items-center justify-between text-xs font-semibold text-muted-foreground">
                 Verify items
                 <button className="normal-case tracking-normal text-primary hover:underline" onClick={() => setChecked(all ? new Set() : new Set(order.lines.map((_, i) => i)))}>
                   {all ? "Clear all" : "Check all"}
@@ -111,7 +111,7 @@ export function PackStation() {
             </div>
             <div className="space-y-4">
               <div>
-                <div className="mb-2 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">Carton</div>
+                <div className="mb-2 text-xs font-semibold text-foreground">Carton</div>
                 <div className="grid grid-cols-2 gap-2">
                   {CARTONS.map((c) => (
                     <button key={c.code} onClick={() => setCarton(c.code)} className={cn("rounded-md border px-2.5 py-2 text-left transition-colors", carton === c.code ? "border-primary bg-primary-soft" : "hover:bg-accent")}>
@@ -136,7 +136,7 @@ export function PackStation() {
               </Button>
               {!all && <p className="text-center text-2xs text-muted-foreground">Verify all {order.lines.length} lines to continue</p>}
               {all && (
-                <p className="flex items-center justify-center gap-1 text-2xs text-success">
+                <p className="flex items-center justify-center gap-1 text-2xs text-success-text">
                   <Check className="size-3" /> All items verified
                 </p>
               )}

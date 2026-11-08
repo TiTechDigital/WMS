@@ -108,7 +108,7 @@ export function InboundView() {
         return (
           <div>
             <div className="tabular">{formatDateTime(row.original.arrivedAt ?? row.original.expectedAt)}</div>
-            <div className={late ? "text-2xs font-medium text-danger" : "text-2xs text-muted-foreground"}>{late ? "Overdue · " : row.original.arrivedAt ? "Arrived · " : "ETA · "}{formatRelative(row.original.arrivedAt ?? row.original.expectedAt)}</div>
+            <div className={late ? "text-2xs font-medium text-danger-text" : "text-2xs text-muted-foreground"}>{late ? "Overdue · " : row.original.arrivedAt ? "Arrived · " : "ETA · "}{formatRelative(row.original.arrivedAt ?? row.original.expectedAt)}</div>
           </div>
         );
       },
@@ -166,7 +166,7 @@ export function InboundView() {
             {NEXT_ACTION[row.original.status]} <ArrowRight />
           </Button>
         ) : (
-          <span className="inline-flex items-center gap-1 text-2xs text-success">
+          <span className="inline-flex items-center gap-1 text-2xs text-success-text">
             <PackageCheck className="size-3.5" /> Closed
           </span>
         ),

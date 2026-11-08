@@ -12,10 +12,10 @@ import { cn } from "@/lib/utils";
 import type { AppNotification } from "@/types";
 
 const KIND: Record<AppNotification["kind"], { icon: React.ElementType; cls: string }> = {
-  alert: { icon: AlertTriangle, cls: "bg-danger-soft text-danger" },
+  alert: { icon: AlertTriangle, cls: "bg-danger-soft text-danger-text" },
   inbound: { icon: PackageOpen, cls: "bg-cyan-50 text-cyan-700" },
   outbound: { icon: Truck, cls: "bg-primary-soft text-primary" },
-  task: { icon: ClipboardCheck, cls: "bg-warning-soft text-[hsl(32_95%_38%)]" },
+  task: { icon: ClipboardCheck, cls: "bg-warning-soft text-warning-text" },
   system: { icon: Server, cls: "bg-muted text-muted-foreground" },
 };
 
@@ -74,12 +74,12 @@ export function NotificationsPanel() {
                     {!n.read && <span className="size-1.5 shrink-0 rounded-full bg-primary" />}
                   </div>
                   <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.body}</p>
-                  <span className="mt-1 block text-2xs text-muted-foreground/80">{formatRelative(n.timestamp)}</span>
+                  <span className="mt-1 block text-2xs text-muted-foreground">{formatRelative(n.timestamp)}</span>
                 </Link>
                 <button
                   onClick={() => actions.dismissNotification(n.id)}
-                  className="absolute right-2 top-2 hidden rounded p-1 text-muted-foreground hover:bg-accent group-hover:block"
-                  aria-label="Dismiss"
+                  className="absolute right-2 top-2 rounded p-1 text-muted-foreground opacity-0 hover:bg-accent focus-visible:opacity-100 group-hover:opacity-100"
+                  aria-label={`Dismiss: ${n.title}`}
                 >
                   <X className="size-3" />
                 </button>

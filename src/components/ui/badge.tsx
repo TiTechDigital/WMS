@@ -7,13 +7,13 @@ export const badgeVariants = cva(
   {
     variants: {
       tone: {
-        neutral: "border-border bg-muted text-muted-foreground",
-        primary: "border-primary/20 bg-primary-soft text-primary",
-        success: "border-success/20 bg-success-soft text-success",
-        warning: "border-warning/30 bg-warning-soft text-[hsl(32_95%_38%)]",
-        danger: "border-danger/20 bg-danger-soft text-danger",
-        violet: "border-violet-200 bg-violet-50 text-violet-700",
-        cyan: "border-cyan-200 bg-cyan-50 text-cyan-700",
+        neutral: "border-border bg-muted text-foreground/80",
+        primary: "border-primary/20 bg-primary-soft text-primary-text",
+        success: "border-success/25 bg-success-soft text-success-text",
+        warning: "border-warning/40 bg-warning-soft text-warning-text",
+        danger: "border-danger/20 bg-danger-soft text-danger-text",
+        violet: "border-violet-200 bg-violet-50 text-violet-800",
+        cyan: "border-cyan-200 bg-cyan-50 text-cyan-800",
         dark: "border-foreground bg-foreground text-white",
       },
     },

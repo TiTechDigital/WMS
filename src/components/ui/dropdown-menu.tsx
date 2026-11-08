@@ -37,7 +37,7 @@ export const DropdownMenuItem = React.forwardRef<
 >(({ className, destructive, ...props }, ref) => (
   <DropdownMenuPrimitive.Item
     ref={ref}
-    className={cn(itemBase, destructive && "text-danger focus:bg-danger-soft [&_svg]:text-danger", className)}
+    className={cn(itemBase, destructive && "text-danger-text focus:bg-danger-soft [&_svg]:text-danger-text", className)}
     {...props}
   />
 ));
@@ -101,7 +101,7 @@ DropdownMenuSubContent.displayName = "DropdownMenuSubContent";
 export function DropdownMenuLabel({ className, ...props }: React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Label>) {
   return (
     <DropdownMenuPrimitive.Label
-      className={cn("px-2 py-1.5 text-2xs font-semibold uppercase tracking-wider text-muted-foreground", className)}
+      className={cn("px-2 py-1.5 text-xs font-medium text-muted-foreground", className)}
       {...props}
     />
   );

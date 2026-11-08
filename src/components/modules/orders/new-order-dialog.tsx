@@ -171,7 +171,7 @@ export function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             <Field label="Notes" htmlFor="o-notes">
               <Textarea id="o-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Delivery instructions, references…" />
             </Field>
-            {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger">{error}</p>}
+            {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger-text">{error}</p>}
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

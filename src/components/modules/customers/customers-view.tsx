@@ -211,7 +211,7 @@ function AddCustomerDialog({ open, onOpenChange }: { open: boolean; onOpenChange
               <Field label="State" required><Input maxLength={2} value={f.state} onChange={(e) => set("state", e.target.value)} /></Field>
               <Field label="ZIP"><Input value={f.postalCode} onChange={(e) => set("postalCode", e.target.value)} /></Field>
             </div>
-            {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger sm:col-span-2">{error}</p>}
+            {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger-text sm:col-span-2">{error}</p>}
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>

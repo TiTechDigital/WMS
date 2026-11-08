@@ -107,7 +107,7 @@ function NavLink({ item, collapsed, badge, onNavigate }: { item: NavItem; collap
       className={cn(
         "group relative flex h-[30px] items-center gap-2.5 rounded-md text-[13px] transition-colors",
         collapsed ? "justify-center px-0" : "px-2.5",
-        active ? "bg-sidebar-accent text-white" : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-white"
+        active ? "bg-sidebar-accent text-white" : "text-sidebar-foreground/85 hover:bg-sidebar-accent/60 hover:text-white"
       )}
     >
       {active && <span className="absolute -left-3 top-1.5 h-5 w-[3px] rounded-r bg-primary" />}
@@ -135,7 +135,7 @@ export function SidebarNav({ collapsed = false, onNavigate }: { collapsed?: bool
       {NAVIGATION.map((section) => (
         <div key={section.title}>
           {!collapsed ? (
-            <div className="mb-1.5 px-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-sidebar-muted/80">{section.title}</div>
+            <div className="mb-1.5 px-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-sidebar-muted">{section.title}</div>
           ) : (
             <div className="mx-auto mb-2 h-px w-5 bg-sidebar-border" />
           )}

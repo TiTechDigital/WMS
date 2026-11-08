@@ -94,13 +94,13 @@ export function InventoryDrawer({ productId, onOpenChange }: { productId: string
                 <TabsContent value="locations" className="pt-4">
                   <div className="overflow-hidden rounded-md border">
                     <table className="w-full text-[13px]">
-                      <thead className="bg-subtle text-2xs uppercase tracking-wide text-muted-foreground">
+                      <thead className="bg-subtle text-xs text-muted-foreground">
                         <tr>
-                          <th className="px-3 py-2 text-left font-semibold">Location</th>
-                          <th className="px-3 py-2 text-left font-semibold">Lot</th>
-                          <th className="px-3 py-2 text-right font-semibold">Avail.</th>
-                          <th className="px-3 py-2 text-right font-semibold">Res.</th>
-                          <th className="px-3 py-2 text-right font-semibold">Total</th>
+                          <th scope="col" className="px-3 py-2 text-left font-medium">Location</th>
+                          <th scope="col" className="px-3 py-2 text-left font-medium">Lot</th>
+                          <th scope="col" className="px-3 py-2 text-right font-medium">Avail.</th>
+                          <th scope="col" className="px-3 py-2 text-right font-medium">Res.</th>
+                          <th scope="col" className="px-3 py-2 text-right font-medium">Total</th>
                         </tr>
                       </thead>
                       <tbody>

@@ -16,6 +16,7 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { ProductThumb } from "@/components/shared/product-thumb";
 import { ActivityFeed } from "@/components/shared/activity-feed";
 import { DateRangePicker, presetRange, type DateRange } from "@/components/shared/date-range-picker";
+import { ExceptionsStrip } from "./exceptions-strip";
 import { StockMovementChart, InOutChart, CategoryDistributionChart, FulfillmentChart } from "./dashboard-charts";
 import { INBOUND_STATUS, PRIORITY, STOCK_STATUS } from "@/lib/status";
 import { formatCompact, formatDateTime, formatNumber, formatRelative } from "@/lib/format";
@@ -49,7 +50,6 @@ export function DashboardView() {
       skus: skuSet.size,
       units,
       pending: pending.length,
-      urgent: pending.filter((o) => o.priority === "urgent").length,
       incoming: incoming.length,
       incomingToday: incoming.filter((s) => s.expectedAt.slice(0, 10) === REFERENCE_NOW.toISOString().slice(0, 10)).length,
       outgoing: outgoing.length,
@@ -170,11 +170,13 @@ export function DashboardView() {
         }
       />
 
+      <ExceptionsStrip />
+
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <KpiCard label="Total SKUs" value={formatNumber(kpi.skus)} icon={Tags} href="/products" footer={<span className="text-muted-foreground">active in {warehouse.id}</span>} />
         <KpiCard label="Stock units" value={formatCompact(kpi.units)} icon={Boxes} delta={periodDelta(metrics, "stockOnHand", 7, "avg")} trend={trend("stockOnHand")} href="/inventory" />
-        <KpiCard label="Pending orders" value={kpi.pending} icon={ClipboardList} delta={periodDelta(metrics, "ordersReceived")} positiveIsGood={false} href="/orders" footer={kpi.urgent ? <Badge tone="danger" className="ml-auto">{kpi.urgent} urgent</Badge> : undefined} />
+        <KpiCard label="Pending orders" value={kpi.pending} icon={ClipboardList} delta={periodDelta(metrics, "ordersReceived")} positiveIsGood={false} href="/orders" />
         <KpiCard label="Incoming shipments" value={kpi.incoming} icon={PackageOpen} delta={periodDelta(metrics, "inbound")} trend={trend("inbound")} href="/inbound" />
         <KpiCard label="Outgoing shipments" value={kpi.outgoing} icon={Truck} delta={periodDelta(metrics, "outbound")} trend={trend("outbound")} href="/outbound" />
         <KpiCard label="Low stock alerts" value={kpi.low} icon={AlertTriangle} tone={kpi.out ? "danger" : "warning"} href="/inventory?status=low_stock" footer={<span className="text-muted-foreground">{kpi.out} out of stock · {kpi.low - kpi.out} below min</span>} />
@@ -390,7 +392,7 @@ export function DashboardView() {
             title="Recent activity"
             actions={
               <Tabs value={actTab} onValueChange={(v) => setActTab(v as "all" | "alerts")}>
-                <TabsList variant="segmented" className="h-7">
+                <TabsList variant="segmented">
                   <TabsTrigger value="all">All</TabsTrigger>
                   <TabsTrigger value="alerts">Alerts</TabsTrigger>
                 </TabsList>
@@ -399,7 +401,7 @@ export function DashboardView() {
           />
           <CardContent className="max-h-[420px] overflow-y-auto scrollbar-thin">
             <ActivityFeed events={feed} />
-            <Link href="/activity" className="mt-3 block text-center text-xs font-medium text-primary hover:underline">
+            <Link href="/activity" className="mt-3 block py-1.5 text-center text-xs font-medium text-primary hover:underline">
               Open activity log
             </Link>
           </CardContent>
