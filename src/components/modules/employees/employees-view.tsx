@@ -4,7 +4,7 @@ import * as React from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Coffee, LogIn, LogOut, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { useWms, nowIso } from "@/store/wms-store";
+import { useWms } from "@/store/wms-store";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataTable, inArrayFilter } from "@/components/data-table/data-table";
 import { Button } from "@/components/ui/button";
@@ -28,16 +28,16 @@ const SHIFTS: Employee["shift"][] = ["Morning", "Afternoon", "Night"];
 const SHIFT_HOURS: Record<Employee["shift"], string> = { Morning: "06:00–14:30", Afternoon: "14:00–22:30", Night: "22:00–06:30" };
 
 export function EmployeesView() {
-  const { employees, pickTasks, activity, warehouse, actions } = useWms();
+  const { employees, pickTasks, activity, warehouse, actions, can } = useWms();
   const [openId, setOpenId] = React.useState<string | null>(null);
   const [addOpen, setAddOpen] = React.useState(false);
   const sel = employees.find((e) => e.id === openId);
   const onShift = employees.filter((e) => e.status === "on_shift" || e.status === "on_break");
   const floor = employees.filter((e) => e.unitsPerHour > 0);
 
-  const setStatus = (e: Employee, status: Employee["status"]) => {
-    actions.setEmployeeStatus(e.id, status);
-    toast.success(`${e.name} · ${EMPLOYEE_STATUS[status].label}`);
+  const canManage = can("employees.manage");
+  const setStatus = async (e: Employee, status: Employee["status"]) => {
+    if (await actions.setEmployeeStatus(e.id, status)) toast.success(`${e.name} · ${EMPLOYEE_STATUS[status].label}`);
   };
 
   const columns: ColumnDef<Employee, unknown>[] = [
@@ -80,7 +80,7 @@ export function EmployeesView() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Employees & Operators" description={`Workforce, shifts and productivity · ${warehouse.name}`} actions={<Button onClick={() => setAddOpen(true)}><Plus /> Add operator</Button>} />
+      <PageHeader title="Employees & Operators" description={`Workforce, shifts and productivity · ${warehouse.name}`} actions={canManage && <Button onClick={() => setAddOpen(true)}><Plus /> Add operator</Button>} />
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border bg-border shadow-card md:grid-cols-4">
         {[
           ["Headcount", `${employees.length}`, `${employees.filter((e) => e.status === "on_leave").length} on leave`],
@@ -144,11 +144,11 @@ export function EmployeesView() {
                   {activity.filter((a) => a.actor === sel.name).length ? <ActivityFeed events={activity.filter((a) => a.actor === sel.name).slice(0, 6)} /> : <p className="text-xs text-muted-foreground">No transactions recorded today.</p>}
                 </div>
               </SheetBody>
-              <SheetFooter>
+              {canManage && <SheetFooter>
                 {sel.status !== "on_shift" && <Button variant="secondary" onClick={() => setStatus(sel, "on_shift")}><LogIn /> Clock in</Button>}
                 {sel.status === "on_shift" && <Button variant="secondary" onClick={() => setStatus(sel, "on_break")}><Coffee /> Start break</Button>}
                 {(sel.status === "on_shift" || sel.status === "on_break") && <Button variant="secondary" onClick={() => setStatus(sel, "off_shift")}><LogOut /> Clock out</Button>}
-              </SheetFooter>
+              </SheetFooter>}
             </>
           )}
         </SheetContent>
@@ -159,7 +159,7 @@ export function EmployeesView() {
 }
 
 function AddOperatorDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
-  const { all, warehouse, actions } = useWms();
+  const { warehouse, actions } = useWms();
   const [name, setName] = React.useState("");
   const [role, setRole] = React.useState<EmployeeRole>("Picker");
   const [shift, setShift] = React.useState<Employee["shift"]>("Morning");
@@ -174,29 +174,12 @@ function AddOperatorDialog({ open, onOpenChange }: { open: boolean; onOpenChange
       setError(null);
     }
   }, [open]);
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim().split(" ").length < 2) return setError("Enter first and last name.");
-    const n = all.employees.length;
-    const emp: Employee = {
-      id: `emp_${Date.now().toString(36)}`,
-      badge: `${warehouse.id.slice(3)}-${1040 + n * 3}`,
-      name: name.trim(),
-      email: `${name.trim().toLowerCase().replace(/[^a-z ]/g, "").replace(/\s+/, ".")}@northstar-logistics.com`,
-      role,
-      warehouseId: warehouse.id,
-      shift,
-      zone,
-      status: "off_shift",
-      unitsPerHour: 0,
-      accuracy: 100,
-      tasksToday: 0,
-      certifications: [],
-      device: ["Picker", "Packer", "Receiver", "Forklift Operator"].includes(role) ? `RF-${300 + n}` : undefined,
-      hiredAt: nowIso(),
-    };
-    actions.upsertEmployee(emp);
-    toast.success(`${emp.name} added`, { description: `Badge ${emp.badge}${emp.device ? ` · device ${emp.device}` : ""}` });
+    const res = await actions.createEmployee({ name: name.trim(), role, shift, zone });
+    if (!res) return;
+    toast.success(`${name.trim()} added`, { description: `Badge ${res.badge}. Create a sign-in for them in Settings → Users.` });
     onOpenChange(false);
   };
   return (

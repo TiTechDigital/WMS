@@ -19,15 +19,19 @@ import { cn } from "@/lib/utils";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 
 export function OrderDrawer({ id, onOpenChange }: { id: string | null; onOpenChange: (v: boolean) => void }) {
-  const { orders, customers, pickTasks, actions } = useWms();
+  const { orders, customers, pickTasks, actions, can } = useWms();
   const o = orders.find((x) => x.id === id);
   const customer = customers.find((c) => c.id === o?.customerId);
   const task = pickTasks.find((t) => t.orderId === id);
   const { confirm, dialog } = useConfirm();
 
-  const advance = () => {
+  const canManage = can("orders.manage");
+  const [busy, setBusy] = React.useState(false);
+  const advance = async () => {
     if (!o) return;
-    const next = actions.advanceOrder(o.id);
+    setBusy(true);
+    const next = await actions.advanceOrder(o.id);
+    setBusy(false);
     if (next) toast.success(`${o.id} → ${ORDER_STATUS[next].label}`);
   };
 
@@ -142,13 +146,12 @@ export function OrderDrawer({ id, onOpenChange }: { id: string | null; onOpenCha
                       <DropdownMenuLabel>Priority</DropdownMenuLabel>
                       <DropdownMenuRadioGroup
                         value={o.priority}
-                        onValueChange={(v) => {
-                          actions.setOrderPriority(o.id, v as Priority);
-                          toast.success(`Priority set to ${PRIORITY[v as Priority].label}`);
+                        onValueChange={async (v) => {
+                          if (await actions.setOrderPriority(o.id, v as Priority)) toast.success(`Priority set to ${PRIORITY[v as Priority].label}`);
                         }}
                       >
                         {(["urgent", "high", "normal", "low"] as Priority[]).map((p) => (
-                          <DropdownMenuRadioItem key={p} value={p} disabled={closed}>
+                          <DropdownMenuRadioItem key={p} value={p} disabled={closed || !canManage}>
                             {PRIORITY[p].label}
                           </DropdownMenuRadioItem>
                         ))}
@@ -170,17 +173,16 @@ export function OrderDrawer({ id, onOpenChange }: { id: string | null; onOpenCha
                       >
                         <Copy /> Copy order ID
                       </DropdownMenuItem>
-                      {!closed && o.status !== "on_hold" && (
+                      {canManage && !closed && o.status !== "on_hold" && (
                         <DropdownMenuItem
-                          onSelect={() => {
-                            actions.setOrderStatus(o.id, "on_hold");
-                            toast.warning(`${o.id} placed on hold`);
+                          onSelect={async () => {
+                            if (await actions.setOrderStatus(o.id, "on_hold")) toast.warning(`${o.id} placed on hold`);
                           }}
                         >
                           <PauseCircle /> Place on hold
                         </DropdownMenuItem>
                       )}
-                      {!closed && (
+                      {canManage && !closed && (
                         <DropdownMenuItem
                           destructive
                           onSelect={() =>
@@ -189,9 +191,8 @@ export function OrderDrawer({ id, onOpenChange }: { id: string | null; onOpenCha
                               description: `${o.customerName} · ${o.lines.length} lines. Reserved stock is released and open pick tasks stop. Cancelled orders can't be reopened.`,
                               confirmLabel: "Cancel order",
                               tone: "danger",
-                              onConfirm: () => {
-                                actions.setOrderStatus(o.id, "cancelled");
-                                toast.error(`${o.id} cancelled`);
+                              onConfirm: async () => {
+                                if (await actions.setOrderStatus(o.id, "cancelled")) toast.error(`${o.id} cancelled`);
                               },
                             })
                           }
@@ -202,8 +203,8 @@ export function OrderDrawer({ id, onOpenChange }: { id: string | null; onOpenCha
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-                {ORDER_NEXT_ACTION[o.status] ? (
-                  <Button onClick={advance}>
+                {ORDER_NEXT_ACTION[o.status] && canManage ? (
+                  <Button onClick={advance} disabled={busy}>
                     {ORDER_NEXT_ACTION[o.status]} <ArrowRight />
                   </Button>
                 ) : (

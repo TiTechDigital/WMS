@@ -6,15 +6,15 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { REFERENCE_NOW } from "@/lib/constants";
+import { currentTime } from "@/lib/constants";
 import { formatDate, toISODate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export type DateRange = { from: string; to: string; preset: string };
 
 const DAY = 86400000;
-const today = toISODate(REFERENCE_NOW);
-const daysAgo = (n: number) => toISODate(new Date(REFERENCE_NOW.getTime() - n * DAY));
+const today = toISODate(currentTime());
+const daysAgo = (n: number) => toISODate(new Date(currentTime().getTime() - n * DAY));
 
 export const DATE_PRESETS: { id: string; label: string; range: () => [string, string] }[] = [
   { id: "today", label: "Today", range: () => [today, today] },
@@ -22,7 +22,7 @@ export const DATE_PRESETS: { id: string; label: string; range: () => [string, st
   { id: "14d", label: "Last 14 days", range: () => [daysAgo(13), today] },
   { id: "30d", label: "Last 30 days", range: () => [daysAgo(29), today] },
   { id: "90d", label: "Last 90 days", range: () => [daysAgo(89), today] },
-  { id: "qtd", label: "Quarter to date", range: () => [`${REFERENCE_NOW.getUTCFullYear()}-10-01`, today] },
+  { id: "qtd", label: "Quarter to date", range: () => [`${currentTime().getUTCFullYear()}-10-01`, today] },
   { id: "180d", label: "Last 6 months", range: () => [daysAgo(179), today] },
 ];
 

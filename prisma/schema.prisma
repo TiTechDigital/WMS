@@ -1,0 +1,465 @@
+// Halden WMS — PostgreSQL schema.
+//
+// Status-like fields are plain strings validated by the API (see src/server/validation.ts)
+// so new statuses don't require a database migration. Document numbers (SO-, ASN-, TR-,
+// ADJ-, PK-) are primary keys generated from the `Sequence` table.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ───────────────────────────── Sites & layout ─────────────────────────────
+
+model Warehouse {
+  id               String   @id // e.g. WH-ATL
+  name             String
+  city             String
+  timezone         String   @default("UTC")
+  /// Multiplier applied to product min/max stock for this site (smaller sites hold less).
+  stockLevelFactor Float    @default(1)
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+
+  zones       Zone[]
+  locations   Location[]
+  inventory   InventoryRecord[]
+  inbound     InboundShipment[]
+  orders      Order[]
+  pickTasks   PickTask[]
+  transfers   StockTransfer[]
+  adjustments StockAdjustment[]
+  employees   Employee[]
+  activity    ActivityEvent[]
+  metrics     DailyMetric[]
+}
+
+model Zone {
+  id          String  @id // e.g. WH-ATL-A
+  warehouseId String
+  code        String
+  name        String
+  type        String // pick-bin | pallet | bulk | cold | staging | dock
+  temperature String?
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([warehouseId, code])
+}
+
+model Location {
+  id            String   @id
+  code          String
+  warehouseId   String
+  zone          String
+  aisle         String
+  rack          String
+  shelf         String
+  bin           String
+  type          String
+  capacity      Int
+  occupied      Int      @default(0)
+  status        String   @default("active") // active | blocked | maintenance | reserved
+  lastCountedAt DateTime @default(now())
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([warehouseId, code])
+  @@index([warehouseId, zone])
+}
+
+// ───────────────────────────── Master data ─────────────────────────────
+
+model Supplier {
+  id           String   @id
+  code         String   @unique
+  name         String
+  contactName  String
+  email        String
+  phone        String
+  city         String
+  country      String
+  leadTimeDays Int
+  onTimeRate   Float
+  qualityScore Float
+  openPOs      Int      @default(0)
+  spendYtd     Float    @default(0)
+  categories   String[]
+  paymentTerms String
+  status       String   @default("active")
+
+  products Product[]
+}
+
+model Customer {
+  id             String @id
+  code           String @unique
+  name           String
+  type           String
+  contactName    String
+  email          String
+  phone          String
+  /// { line1, city, state, postalCode, country }
+  address        Json
+  slaTier        String
+  ordersYtd      Int    @default(0)
+  revenueYtd     Float  @default(0)
+  onTimeDelivery Float  @default(100)
+  status         String @default("active")
+}
+
+model Product {
+  id           String   @id
+  sku          String   @unique
+  name         String
+  barcode      String
+  category     String
+  brand        String
+  description  String
+  uom          String
+  unitsPerCase Int      @default(1)
+  weightKg     Float
+  lengthCm     Float
+  widthCm      Float
+  heightCm     Float
+  minStock     Int
+  maxStock     Int
+  reorderQty   Int
+  supplierId   String
+  unitCost     Float
+  unitPrice    Float
+  storage      String   @default("ambient")
+  status       String   @default("active")
+  /// Data URL or external URL. Swap for object storage (S3/R2/Vercel Blob) in production.
+  imageUrl     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  supplier  Supplier          @relation(fields: [supplierId], references: [id])
+  inventory InventoryRecord[]
+
+  @@index([barcode])
+}
+
+// ───────────────────────────── Inventory ─────────────────────────────
+
+model InventoryRecord {
+  id           String    @id
+  warehouseId  String
+  productId    String
+  locationId   String
+  locationCode String
+  lot          String
+  expiresAt    DateTime?
+  available    Int
+  reserved     Int       @default(0)
+  total        Int
+  status       String // in_stock | low_stock | out_of_stock | overstock
+  updatedAt    DateTime  @default(now())
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id])
+
+  @@index([warehouseId, productId])
+  @@index([warehouseId, locationCode])
+}
+
+// ───────────────────────────── Inbound ─────────────────────────────
+
+model InboundShipment {
+  id             String    @id // ASN number
+  warehouseId    String
+  poNumber       String
+  supplierId     String
+  supplierName   String
+  carrier        String
+  trackingNumber String
+  dock           String?
+  expectedAt     DateTime
+  arrivedAt      DateTime?
+  completedAt    DateTime?
+  status         String
+  priority       String
+  pallets        Int
+  notes          String?
+
+  warehouse Warehouse     @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  lines     InboundLine[]
+
+  @@index([warehouseId, status])
+}
+
+model InboundLine {
+  id          String @id @default(cuid())
+  shipmentId  String
+  position    Int
+  productId   String
+  sku         String
+  productName String
+  expected    Int
+  received    Int    @default(0)
+  damaged     Int    @default(0)
+
+  shipment InboundShipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+}
+
+// ───────────────────────────── Outbound ─────────────────────────────
+
+model Order {
+  id              String    @id // SO number
+  warehouseId     String
+  customerId      String
+  customerName    String
+  channel         String
+  createdAt       DateTime  @default(now())
+  requestedShipAt DateTime
+  shippedAt       DateTime?
+  priority        String
+  status          String
+  /// Ship-to snapshot taken when the order was placed.
+  shippingAddress Json
+  carrier         String
+  service         String
+  trackingNumber  String?
+  weightKg        Float
+  cartons         Int
+  notes           String?
+
+  warehouse Warehouse   @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  lines     OrderLine[]
+
+  @@index([warehouseId, status])
+  @@index([customerId])
+}
+
+model OrderLine {
+  id           String @id @default(cuid())
+  orderId      String
+  position     Int
+  productId    String
+  sku          String
+  productName  String
+  locationCode String
+  quantity     Int
+  picked       Int    @default(0)
+  packed       Int    @default(0)
+  unitPrice    Float
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model PickTask {
+  id           String    @id // PK number
+  warehouseId  String
+  orderId      String
+  customerName String
+  type         String
+  zone         String
+  assigneeId   String?
+  assigneeName String?
+  priority     String
+  status       String
+  createdAt    DateTime  @default(now())
+  startedAt    DateTime?
+  dueAt        DateTime
+  cart         String?
+
+  warehouse Warehouse  @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  lines     PickLine[]
+
+  @@index([warehouseId, status])
+  @@index([orderId])
+}
+
+model PickLine {
+  id           String @id @default(cuid())
+  taskId       String
+  position     Int
+  sku          String
+  productName  String
+  locationCode String
+  quantity     Int
+  picked       Int    @default(0)
+  uom          String
+
+  task PickTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+// ───────────────────────────── Moves & corrections ─────────────────────────────
+
+model StockTransfer {
+  id           String    @id // TR number
+  warehouseId  String
+  type         String
+  fromLocation String
+  toLocation   String
+  status       String
+  requestedBy  String
+  assignedTo   String?
+  createdAt    DateTime  @default(now())
+  completedAt  DateTime?
+  reason       String
+
+  warehouse Warehouse      @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  lines     TransferLine[]
+
+  @@index([warehouseId, status])
+}
+
+model TransferLine {
+  id          String @id @default(cuid())
+  transferId  String
+  position    Int
+  productId   String
+  sku         String
+  productName String
+  quantity    Int
+
+  transfer StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+}
+
+model StockAdjustment {
+  id           String   @id // ADJ number
+  warehouseId  String
+  productId    String
+  sku          String
+  productName  String
+  locationCode String
+  before       Int
+  after        Int
+  reason       String
+  note         String?
+  requestedBy  String
+  approvedBy   String?
+  createdAt    DateTime @default(now())
+  status       String // pending | approved | rejected
+  valueImpact  Float
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@index([warehouseId, status])
+}
+
+// ───────────────────────────── People & access ─────────────────────────────
+
+model Employee {
+  id             String   @id
+  badge          String   @unique
+  name           String
+  email          String
+  role           String // job function: Picker, Packer, Receiver, …
+  warehouseId    String
+  shift          String
+  zone           String
+  status         String
+  unitsPerHour   Int      @default(0)
+  accuracy       Float    @default(100)
+  tasksToday     Int      @default(0)
+  certifications String[]
+  device         String?
+  hiredAt        DateTime @default(now())
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  user      User?
+}
+
+/// A person who can sign in. `role` controls permissions (see src/server/auth/permissions.ts).
+model User {
+  id           String    @id @default(cuid())
+  /// Sign-in identifier: employee badge (e.g. ATL-1040) or email.
+  login        String    @unique
+  email        String    @unique
+  name         String
+  passwordHash String
+  role         String // admin | manager | supervisor | operator
+  /// Home site; admins and managers may switch sites.
+  warehouseId  String?
+  employeeId   String?   @unique
+  active       Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  /// Free-form profile fields (phone, language).
+  profile      Json      @default("{}")
+
+  employee Employee? @relation(fields: [employeeId], references: [id])
+}
+
+// ───────────────────────────── System ─────────────────────────────
+
+model ActivityEvent {
+  id          String   @id @default(cuid())
+  warehouseId String
+  timestamp   DateTime @default(now())
+  actor       String
+  actorRole   String
+  module      String
+  action      String
+  entity      String
+  details     String
+  severity    String
+  source      String
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@index([warehouseId, timestamp])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  timestamp DateTime @default(now())
+  kind      String
+  read      Boolean  @default(false)
+  href      String
+  /// null = visible to everyone
+  userId    String?
+}
+
+model DailyMetric {
+  warehouseId    String
+  date           String // YYYY-MM-DD
+  inbound        Int
+  outbound       Int
+  adjustments    Int
+  stockOnHand    Int
+  ordersReceived Int
+  ordersShipped  Int
+  onTimeRate     Float
+  pickRate       Int
+  avgPickMinutes Float
+  accuracy       Float
+  utilization    Float
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@id([warehouseId, date])
+}
+
+/// Key/value configuration (organization settings, notification prefs, integrations).
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model ReportSchedule {
+  id         String   @id @default(cuid())
+  reportId   String
+  frequency  String
+  time       String
+  recipients String
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+}
+
+/// Document number counters (SO, ASN, TR, ADJ, PK).
+model Sequence {
+  name  String @id
+  value Int
+}

@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { Check, ChevronsUpDown, PanelLeftClose, PanelLeftOpen, Warehouse as WarehouseIcon } from "lucide-react";
 import { NAVIGATION, type NavItem } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
-import { WAREHOUSES } from "@/lib/constants";
 import { useWms } from "@/store/wms-store";
 import { LogoMark, PRODUCT_NAME } from "./logo";
 import { Hint } from "@/components/ui/tooltip";
@@ -35,7 +34,8 @@ function useNavBadges() {
 }
 
 export function WarehouseSwitcher({ collapsed }: { collapsed?: boolean }) {
-  const { warehouse, setWarehouseId, all } = useWms();
+  const { warehouse, warehouses, setWarehouseId, all, can } = useWms();
+  const canSwitch = can("sites.switch") && warehouses.length > 1;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -61,7 +61,8 @@ export function WarehouseSwitcher({ collapsed }: { collapsed?: boolean }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side={collapsed ? "right" : "bottom"} className="w-64">
         <DropdownMenuLabel>Switch site</DropdownMenuLabel>
-        {WAREHOUSES.map((w) => {
+        {!canSwitch && <div className="px-2 py-1.5 text-xs text-muted-foreground">You have access to this site only.</div>}
+        {(canSwitch ? warehouses : []).map((w) => {
           const skus = new Set(all.inventory.filter((r) => r.warehouseId === w.id).map((r) => r.productId)).size;
           return (
             <DropdownMenuItem
@@ -84,13 +85,15 @@ export function WarehouseSwitcher({ collapsed }: { collapsed?: boolean }) {
             </DropdownMenuItem>
           );
         })}
-        <DropdownMenuSeparator />
+        {can("settings.manage") && <DropdownMenuSeparator />}
+        {can("settings.manage") && (
         <DropdownMenuItem asChild>
           <Link href="/settings?tab=sites">
             <WarehouseIcon />
             Manage sites
           </Link>
         </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -151,6 +154,8 @@ export function SidebarNav({ collapsed = false, onNavigate }: { collapsed?: bool
 }
 
 export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+  const { settings } = useWms();
+  const company = String((settings.organization as { company?: string } | undefined)?.company ?? "");
   return (
     <aside
       className={cn(
@@ -163,7 +168,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
         {!collapsed && (
           <div className="leading-tight">
             <div className="text-sm font-semibold tracking-tight text-white">{PRODUCT_NAME}<span className="ml-1 font-normal text-sidebar-muted">WMS</span></div>
-            <div className="text-2xs text-sidebar-muted">Northstar Logistics</div>
+            {company && <div className="truncate text-2xs text-sidebar-muted">{company}</div>}
           </div>
         )}
       </div>

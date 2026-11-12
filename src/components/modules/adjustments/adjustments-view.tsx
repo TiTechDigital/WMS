@@ -4,7 +4,7 @@ import * as React from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Check, Plus, X } from "lucide-react";
 import { toast } from "sonner";
-import { useWms, nowIso, CURRENT_USER } from "@/store/wms-store";
+import { useWms } from "@/store/wms-store";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataTable, inArrayFilter } from "@/components/data-table/data-table";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,7 @@ const REASONS: AdjustmentReason[] = ["Cycle count", "Damaged goods", "Expired", 
 type Row = StockAdjustment & { delta: number };
 
 export function AdjustmentsView() {
-  const { adjustments, warehouse, actions } = useWms();
+  const { adjustments, warehouse, actions, can } = useWms();
   const [tab, setTab] = React.useState<"pending" | "all">("all");
   const [open, setOpen] = React.useState(false);
   const [presetSku, setPresetSku] = React.useState<string | undefined>();
@@ -42,9 +42,10 @@ export function AdjustmentsView() {
   const posted = rows.filter((r) => r.status === "approved");
   const data = tab === "pending" ? pending : rows;
 
-  const review = (ids: string[], d: "approved" | "rejected") => {
-    ids.forEach((id) => actions.reviewAdjustment(id, d));
-    toast.success(`${ids.length} adjustment${ids.length === 1 ? "" : "s"} ${d === "approved" ? "approved & posted" : "rejected"}`);
+  const canApprove = can("adjustments.approve");
+  const review = async (ids: string[], d: "approved" | "rejected") => {
+    const r = await actions.reviewAdjustment(ids, d);
+    if (r) toast.success(`${r.count} adjustment${r.count === 1 ? "" : "s"} ${d === "approved" ? "approved & posted" : "rejected"}`);
   };
 
   const columns: ColumnDef<Row, unknown>[] = [
@@ -74,7 +75,7 @@ export function AdjustmentsView() {
       enableHiding: false,
       enableSorting: false,
       cell: ({ row }) =>
-        row.original.status === "pending" ? (
+        row.original.status === "pending" && canApprove ? (
           <div className="flex justify-end gap-1">
             <Button size="sm" variant="secondary" onClick={() => review([row.original.id], "approved")}>
               <Check /> Approve
@@ -140,7 +141,7 @@ export function AdjustmentsView() {
         ]}
         initialVisibility={{ requestedBy: false }}
         getRowId={(r) => r.id}
-        selectable
+        selectable={canApprove}
         bulkActions={(sel, clear) => {
           const ids = sel.filter((s) => s.status === "pending").map((s) => s.id);
           return (
@@ -198,7 +199,9 @@ export function AdjustmentsView() {
 }
 
 function NewAdjustmentDialog({ open, onOpenChange, presetSku }: { open: boolean; onOpenChange: (v: boolean) => void; presetSku?: string }) {
-  const { products, inventory, warehouse, adjustments, actions } = useWms();
+  const { products, inventory, actions, can, roleLabel } = useWms();
+  const canPost = can("adjustments.approve");
+  const [saving, setSaving] = React.useState(false);
   const [product, setProduct] = React.useState<Product | undefined>();
   const [loc, setLoc] = React.useState("");
   const [counted, setCounted] = React.useState("");
@@ -230,31 +233,17 @@ function NewAdjustmentDialog({ open, onOpenChange, presetSku }: { open: boolean;
   }, [recs, loc]);
   const delta = rec && counted !== "" ? Number(counted) - rec.total : 0;
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!product || !rec) return setError("Select a product and location.");
     if (counted === "" || Number(counted) < 0) return setError("Enter the counted quantity.");
     if (delta === 0) return setError("Counted quantity matches system — no adjustment needed.");
     if (reason !== "Cycle count" && reason !== "Data correction" && !note.trim()) return setError("Add a note explaining the adjustment.");
-    const max = Math.max(...adjustments.map((a) => Number(a.id.replace("ADJ-", "")) || 0), 9100);
-    const a: StockAdjustment = {
-      id: `ADJ-${max + 2}`,
-      warehouseId: warehouse.id,
-      productId: product.id,
-      sku: product.sku,
-      productName: product.name,
-      locationCode: rec.locationCode,
-      before: rec.total,
-      after: Number(counted),
-      reason,
-      note: note.trim() || undefined,
-      requestedBy: CURRENT_USER.name,
-      createdAt: nowIso(),
-      status: "pending",
-      valueImpact: Number((delta * product.unitCost).toFixed(2)),
-    };
-    actions.createAdjustment(a, postNow);
-    toast.success(`${a.id} ${postNow ? "posted" : "submitted for approval"}`, { description: `${product.sku} ${delta > 0 ? "+" : ""}${delta} at ${rec.locationCode}` });
+    setSaving(true);
+    const res = await actions.createAdjustment({ productId: product.id, locationCode: rec.locationCode, counted: Number(counted), reason, note: note.trim() || undefined, postNow: postNow && canPost });
+    setSaving(false);
+    if (!res) return;
+    toast.success(`${res.id} ${res.status === "approved" ? "posted" : "submitted for approval"}`, { description: `${product.sku} ${delta > 0 ? "+" : ""}${delta} at ${rec.locationCode}` });
     onOpenChange(false);
   };
 
@@ -315,20 +304,22 @@ function NewAdjustmentDialog({ open, onOpenChange, presetSku }: { open: boolean;
             <Field label="Note" htmlFor="adj-note">
               <Textarea id="adj-note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Required for damage, expiry, shrinkage…" />
             </Field>
-            <div className="flex items-center justify-between rounded-md border bg-subtle px-3 py-2.5">
-              <div>
-                <Label htmlFor="adj-post">Post immediately</Label>
-                <p className="text-2xs text-muted-foreground">Skip approval — you hold the Operations Manager role.</p>
+            {canPost && (
+              <div className="flex items-center justify-between rounded-md border bg-subtle px-3 py-2.5">
+                <div>
+                  <Label htmlFor="adj-post">Post immediately</Label>
+                  <p className="text-2xs text-muted-foreground">Skip approval — your role ({roleLabel}) can approve adjustments.</p>
+                </div>
+                <Switch id="adj-post" checked={postNow} onCheckedChange={setPostNow} />
               </div>
-              <Switch id="adj-post" checked={postNow} onCheckedChange={setPostNow} />
-            </div>
+            )}
             {error && <p className="rounded-md bg-danger-soft px-3 py-2 text-xs text-danger-text">{error}</p>}
           </DialogBody>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit">{postNow ? "Post adjustment" : "Submit for approval"}</Button>
+            <Button type="submit" disabled={saving}>{saving ? "Saving…" : postNow && canPost ? "Post adjustment" : "Submit for approval"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

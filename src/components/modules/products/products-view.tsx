@@ -4,7 +4,7 @@ import * as React from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { Copy, LayoutGrid, MoreHorizontal, Pencil, Plus, Rows3, Archive, Eye } from "lucide-react";
 import { toast } from "sonner";
-import { useWms, nowIso } from "@/store/wms-store";
+import { useWms } from "@/store/wms-store";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataTable, inArrayFilter } from "@/components/data-table/data-table";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage";
 type Row = Product & { supplierName: string; onHand: number; stock?: StockStatus };
 
 export function ProductsView() {
-  const { products, suppliers, inventory, actions } = useWms();
+  const { products, suppliers, inventory, actions, can } = useWms();
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Product | undefined>();
   const [viewing, setViewing] = React.useState<string | null>(null);
@@ -60,14 +60,14 @@ export function ProductsView() {
     return products.map((p) => ({ ...p, supplierName: supplierName.get(p.supplierId) ?? "—", onHand: onHand.get(p.id) ?? 0, stock: st.get(p.id) }));
   }, [products, inventory, supplierName]);
 
-  const duplicate = (p: Product) => {
-    const copy: Product = { ...p, id: `prd_${Date.now().toString(36)}`, sku: `${p.sku}-CP`, name: `${p.name} (copy)`, status: "draft", createdAt: nowIso(), updatedAt: nowIso() };
-    actions.upsertProduct(copy);
-    toast.success("Product duplicated as draft", { description: copy.sku });
+  const canManage = can("products.manage");
+  const duplicate = async (p: Product) => {
+    const copy: Product = { ...p, sku: `${p.sku}-CP`.slice(0, 40), name: `${p.name} (copy)`, status: "draft" };
+    if (await actions.upsertProduct(copy, true)) toast.success("Product duplicated as draft", { description: copy.sku });
   };
-  const toggleArchive = (p: Product) => {
+  const toggleArchive = async (p: Product) => {
     const status = p.status === "discontinued" ? "active" : "discontinued";
-    actions.upsertProduct({ ...p, status, updatedAt: nowIso() });
+    if (!(await actions.upsertProduct({ ...p, status }, false))) return;
     toast.success(status === "discontinued" ? "Product discontinued" : "Product reactivated", { description: p.sku });
   };
 
@@ -82,16 +82,22 @@ export function ProductsView() {
         <DropdownMenuItem onSelect={() => setViewing(p.id)}>
           <Eye /> View stock
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => openEdit(p)}>
-          <Pencil /> Edit
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => duplicate(p)}>
-          <Copy /> Duplicate
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem destructive={p.status !== "discontinued"} onSelect={() => toggleArchive(p)}>
-          <Archive /> {p.status === "discontinued" ? "Reactivate" : "Discontinue"}
-        </DropdownMenuItem>
+        {canManage && (
+          <DropdownMenuItem onSelect={() => openEdit(p)}>
+            <Pencil /> Edit
+          </DropdownMenuItem>
+        )}
+        {canManage && (
+          <>
+            <DropdownMenuItem onSelect={() => duplicate(p)}>
+              <Copy /> Duplicate
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem destructive={p.status !== "discontinued"} onSelect={() => toggleArchive(p)}>
+              <Archive /> {p.status === "discontinued" ? "Reactivate" : "Discontinue"}
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -155,9 +161,11 @@ export function ProductsView() {
                 </TabsTrigger>
               </TabsList>
             </Tabs>
-            <Button onClick={openCreate}>
-              <Plus /> Add product
-            </Button>
+            {canManage && (
+              <Button onClick={openCreate}>
+                <Plus /> Add product
+              </Button>
+            )}
           </>
         }
       />

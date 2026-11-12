@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, LabelList } from "recharts";
-import { AXIS, ChartTooltip, GRID, Legend, SERIES } from "@/components/charts/chart-kit";
+import { AXIS, ChartEmpty, ChartTooltip, GRID, Legend, SERIES } from "@/components/charts/chart-kit";
 import { formatCompact, formatNumber } from "@/lib/format";
 import { shortDay } from "@/lib/metrics";
 import type { DailyMetric } from "@/types";
@@ -10,6 +10,7 @@ import type { DailyMetric } from "@/types";
 type Row = DailyMetric & { label?: string };
 
 export function StockMovementChart({ data, height = 240 }: { data: Row[]; height?: number }) {
+  if (!data.length) return <ChartEmpty height={height} message="Stock history appears after the first day of activity" />;
   const min = Math.min(...data.map((d) => d.stockOnHand));
   const max = Math.max(...data.map((d) => d.stockOnHand));
   const pad = (max - min) * 0.25 || 1000;
@@ -38,6 +39,7 @@ export function StockMovementChart({ data, height = 240 }: { data: Row[]; height
 }
 
 export function InOutChart({ data, height = 240 }: { data: Row[]; height?: number }) {
+  if (!data.length) return <ChartEmpty height={height} message="No inbound or outbound movements in this period" />;
   const totals = data.reduce((a, d) => ({ i: a.i + d.inbound, o: a.o + d.outbound }), { i: 0, o: 0 });
   return (
     <div>
@@ -65,6 +67,7 @@ export function InOutChart({ data, height = 240 }: { data: Row[]; height?: numbe
 }
 
 export function CategoryDistributionChart({ data, height = 280 }: { data: { category: string; units: number; skus: number }[]; height?: number }) {
+  if (!data.length) return <ChartEmpty height={height} message="No stock on hand yet" />;
   const total = data.reduce((s, d) => s + d.units, 0) || 1;
   const summary = `Bar chart of units on hand by category: ${data.map((d) => `${d.category} ${formatNumber(d.units)}`).join(", ")}.`;
   return (
@@ -105,6 +108,7 @@ export function CategoryDistributionChart({ data, height = 280 }: { data: { cate
 }
 
 export function FulfillmentChart({ data, height = 160, target = 97 }: { data: Row[]; height?: number; target?: number }) {
+  if (!data.length) return <ChartEmpty height={height} message="No shipments in this period" />;
   const avg = data.length ? data.reduce((s, d) => s + d.onTimeRate, 0) / data.length : 0;
   const below = data.filter((d) => d.onTimeRate < target).length;
   return (

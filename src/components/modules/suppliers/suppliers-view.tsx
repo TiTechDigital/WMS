@@ -33,7 +33,7 @@ const SUPPLIER_STATUS: Record<Supplier["status"], { label: string; tone: BadgeTo
 type Row = Supplier & { openAsns: number; skus: number };
 
 export function SuppliersView() {
-  const { suppliers, products, all, actions } = useWms();
+  const { suppliers, products, all, actions, can } = useWms();
   const [openId, setOpenId] = React.useState<string | null>(null);
   const [addOpen, setAddOpen] = React.useState(false);
 
@@ -92,9 +92,11 @@ export function SuppliersView() {
         title="Suppliers"
         description="Vendor master data and inbound performance across the network"
         actions={
-          <Button onClick={() => setAddOpen(true)}>
-            <Plus /> Add supplier
-          </Button>
+          can("partners.manage") && (
+            <Button onClick={() => setAddOpen(true)}>
+              <Plus /> Add supplier
+            </Button>
+          )
         }
       />
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border bg-border shadow-card md:grid-cols-4">
@@ -189,10 +191,12 @@ export function SuppliersView() {
                 <div className="flex gap-2">
                   <Button
                     variant="secondary"
-                    onClick={() => {
+                    disabled={!can("partners.manage")}
+                    title={can("partners.manage") ? undefined : "Requires warehouse manager or above"}
+                    onClick={async () => {
+                      const { openAsns: _a, skus: _s, ...supplier } = sel;
                       const status = sel.status === "active" ? "on_hold" : "active";
-                      actions.upsertSupplier({ ...sel, status });
-                      toast.success(status === "on_hold" ? `${sel.name} placed on hold` : `${sel.name} reactivated`);
+                      if (await actions.upsertSupplier({ ...supplier, status }, false)) toast.success(status === "on_hold" ? `${sel.name} placed on hold` : `${sel.name} reactivated`);
                     }}
                   >
                     {sel.status === "active" ? <><PauseCircle /> Put on hold</> : <><PlayCircle /> Activate</>}
@@ -223,7 +227,7 @@ function AddSupplierDialog({ open, onOpenChange }: { open: boolean; onOpenChange
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!f.name.trim() || !f.contactName.trim()) return setError("Company and contact name are required.");
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email)) return setError("Enter a valid email address.");
@@ -246,8 +250,9 @@ function AddSupplierDialog({ open, onOpenChange }: { open: boolean; onOpenChange
       paymentTerms: f.paymentTerms,
       status: "active",
     };
-    actions.upsertSupplier(s);
-    toast.success(`${s.name} added`, { description: s.code });
+    const res = await actions.upsertSupplier(s, true);
+    if (!res) return;
+    toast.success(`${s.name} added`);
     onOpenChange(false);
   };
   return (

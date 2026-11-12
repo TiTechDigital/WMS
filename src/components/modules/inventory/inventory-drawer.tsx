@@ -25,7 +25,7 @@ export function InventoryDrawer({ productId, onOpenChange }: { productId: string
   const total = rows.reduce((s, r) => s + r.total, 0);
   const available = rows.reduce((s, r) => s + r.available, 0);
   const reserved = rows.reduce((s, r) => s + r.reserved, 0);
-  const scale = warehouse.id === "WH-ATL" ? 1 : warehouse.id === "WH-DAL" ? 0.55 : 0.42;
+  const scale = warehouse.stockLevelFactor;
   const min = product ? Math.round(product.minStock * scale) : 0;
   const max = product ? Math.round(product.maxStock * scale) : 0;
   const supplier = suppliers.find((s) => s.id === product?.supplierId);

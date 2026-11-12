@@ -62,3 +62,12 @@ export function Legend({ items, className }: { items: { label: string; color: st
     </div>
   );
 }
+
+/** Shown in place of a chart when there's no data for the selected period. */
+export function ChartEmpty({ height = 200, message = "No data for this period yet" }: { height?: number; message?: string }) {
+  return (
+    <div style={{ height }} className="flex items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground">
+      {message}
+    </div>
+  );
+}

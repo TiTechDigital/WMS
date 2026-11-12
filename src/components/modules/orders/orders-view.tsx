@@ -24,7 +24,8 @@ import type { Order } from "@/types";
 type Row = Order & { qty: number; value: number; items: number };
 
 export function OrdersView() {
-  const { orders, warehouse, actions } = useWms();
+  const { orders, warehouse, actions, can } = useWms();
+  const canManage = can("orders.manage");
   const [openId, setOpenId] = React.useState<string | null>(null);
   const [newOpen, setNewOpen] = React.useState(false);
   const [tab, setTab] = React.useState<"all" | "open" | "shipped" | "exceptions">("all");
@@ -74,13 +75,13 @@ export function OrdersView() {
       enableSorting: false,
       enableHiding: false,
       cell: ({ row }) =>
-        ORDER_NEXT_ACTION[row.original.status] ? (
+        ORDER_NEXT_ACTION[row.original.status] && canManage ? (
           <Button
             size="sm"
             variant="ghost"
-            onClick={(e) => {
+            onClick={async (e) => {
               e.stopPropagation();
-              const next = actions.advanceOrder(row.original.id);
+              const next = await actions.advanceOrder(row.original.id);
               if (next) toast.success(`${row.original.id} → ${ORDER_STATUS[next].label}`);
             }}
           >
@@ -98,9 +99,11 @@ export function OrdersView() {
         actions={
           <>
             <DateRangePicker value={range} onChange={setRange} />
-            <Button onClick={() => setNewOpen(true)}>
-              <Plus /> New order
-            </Button>
+            {canManage && (
+              <Button onClick={() => setNewOpen(true)}>
+                <Plus /> New order
+              </Button>
+            )}
           </>
         }
       />
@@ -136,7 +139,7 @@ export function OrdersView() {
         initialSorting={[{ id: "createdAt", desc: true }]}
         onRowClick={(r) => setOpenId(r.id)}
         getRowId={(r) => r.id}
-        selectable
+        selectable={canManage}
         bulkActions={(sel, clear) => (
           <>
             <Button
@@ -151,9 +154,14 @@ export function OrdersView() {
                   description: `Each order moves one step through fulfillment (e.g. New → Allocated).${skipped ? ` ${skipped} selected order${skipped === 1 ? " is" : "s are"} closed or on hold and will be skipped.` : ""}`,
                   items: ok.map((o) => `${o.id} · ${ORDER_STATUS[o.status].label} → next`),
                   confirmLabel: `Advance ${ok.length}`,
-                  onConfirm: () => {
-                    ok.forEach((o) => actions.advanceOrder(o.id));
-                    toast.success(`${ok.length} orders advanced`, { description: skipped ? `${skipped} skipped (closed or on hold)` : undefined });
+                  onConfirm: async () => {
+                    const r = await actions.advanceOrders(ok.map((o) => o.id));
+                    if (!r) return;
+                    const done = r.results.filter((x) => x.status).length;
+                    const failed = r.results.filter((x) => x.error);
+                    toast.success(`${done} order${done === 1 ? "" : "s"} advanced`, {
+                      description: [skipped && `${skipped} skipped (closed or on hold)`, failed.length && `${failed.length} failed: ${failed[0].error}`].filter(Boolean).join(" · ") || undefined,
+                    });
                     clear();
                   },
                 });
@@ -172,9 +180,8 @@ export function OrdersView() {
                   description: "Held orders stop at their current stage and won't be released to picking until the hold is removed.",
                   items: ok.map((o) => `${o.id} · ${o.customerName}`),
                   confirmLabel: `Hold ${ok.length}`,
-                  onConfirm: () => {
-                    ok.forEach((o) => actions.setOrderStatus(o.id, "on_hold"));
-                    toast.warning(`${ok.length} orders placed on hold`);
+                  onConfirm: async () => {
+                    if (await actions.setOrderStatus(ok.map((o) => o.id), "on_hold")) toast.warning(`${ok.length} orders placed on hold`);
                     clear();
                   },
                 });

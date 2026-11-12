@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Field } from "@/components/shared/form-field";
 import { ProductThumb } from "@/components/shared/product-thumb";
-import { useWms, nowIso } from "@/store/wms-store";
+import { useWms } from "@/store/wms-store";
 import { CATEGORIES, type Category, type Product, type ProductStatus, type StorageCondition, type UnitOfMeasure } from "@/types";
 
 const UOMS: UnitOfMeasure[] = ["EA", "BOX", "CS", "PK", "RL", "KG", "L", "PLT"];
@@ -84,6 +84,7 @@ function fromProduct(p?: Product): FormState {
 
 export function ProductFormDialog({ open, onOpenChange, product }: { open: boolean; onOpenChange: (v: boolean) => void; product?: Product }) {
   const { suppliers, products, actions } = useWms();
+  const [saving, setSaving] = React.useState(false);
   const [f, setF] = React.useState<FormState>(fromProduct(product));
   const [errors, setErrors] = React.useState<Partial<Record<keyof FormState, string>>>({});
   const [tab, setTab] = React.useState("general");
@@ -127,7 +128,7 @@ export function ProductFormDialog({ open, onOpenChange, product }: { open: boole
     return Object.keys(e).length === 0;
   };
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     const p: Product = {
@@ -151,10 +152,13 @@ export function ProductFormDialog({ open, onOpenChange, product }: { open: boole
       storage: f.storage,
       status: f.status,
       imageUrl: f.imageUrl,
-      createdAt: product?.createdAt ?? nowIso(),
-      updatedAt: nowIso(),
+      createdAt: product?.createdAt ?? "",
+      updatedAt: "",
     };
-    actions.upsertProduct(p);
+    setSaving(true);
+    const res = await actions.upsertProduct(p, !isEdit);
+    setSaving(false);
+    if (!res) return;
     toast.success(isEdit ? "Product updated" : "Product created", { description: `${p.sku} · ${p.name}` });
     onOpenChange(false);
   };
@@ -358,7 +362,7 @@ export function ProductFormDialog({ open, onOpenChange, product }: { open: boole
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit">{isEdit ? "Save changes" : "Create product"}</Button>
+            <Button type="submit" disabled={saving}>{saving ? "Saving…" : isEdit ? "Save changes" : "Create product"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

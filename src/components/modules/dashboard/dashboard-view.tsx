@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, ArrowUpRight, Boxes, ClipboardList, Download, PackageOpen, Tags, Truck, Users } from "lucide-react";
 import { toast } from "sonner";
-import { useWms, nowIso, CURRENT_USER } from "@/store/wms-store";
+import { useWms } from "@/store/wms-store";
 import { PageHeader } from "@/components/shared/page-header";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -22,17 +22,22 @@ import { INBOUND_STATUS, PRIORITY, STOCK_STATUS } from "@/lib/status";
 import { formatCompact, formatDateTime, formatNumber, formatRelative } from "@/lib/format";
 import { bucketMetrics, periodDelta, sliceMetrics } from "@/lib/metrics";
 import { downloadCsv } from "@/lib/csv";
-import { REFERENCE_NOW } from "@/lib/constants";
+import { currentTime } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import type { Category } from "@/types";
 
+function shiftName() {
+  const h = new Date().getHours();
+  return h >= 6 && h < 14 ? "Morning shift" : h >= 14 && h < 22 ? "Afternoon shift" : "Night shift";
+}
+
 function greeting() {
-  const h = REFERENCE_NOW.getUTCHours() - 5; // site local (ET)
+  const h = new Date().getHours(); // the viewer's local time
   return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
 }
 
 export function DashboardView() {
-  const { warehouse, inventory, orders, inbound, pickTasks, metrics, activity, locations, zones, products, employees, actions } = useWms();
+  const { warehouse, inventory, orders, inbound, pickTasks, metrics, activity, locations, zones, products, employees, actions, user } = useWms();
   const [range, setRange] = React.useState<DateRange>(presetRange("30d"));
   const [actTab, setActTab] = React.useState<"all" | "alerts">("all");
 
@@ -45,13 +50,13 @@ export function DashboardView() {
     const lowSkus = new Set(inventory.filter((r) => r.status === "low_stock" || r.status === "out_of_stock").map((r) => r.productId));
     const pending = orders.filter((o) => ["new", "allocated", "picking", "packing", "on_hold"].includes(o.status));
     const incoming = inbound.filter((s) => s.status !== "completed");
-    const outgoing = orders.filter((o) => o.status === "ready_to_ship" || (o.status === "shipped" && o.shippedAt && REFERENCE_NOW.getTime() - new Date(o.shippedAt).getTime() < 86400000));
+    const outgoing = orders.filter((o) => o.status === "ready_to_ship" || (o.status === "shipped" && o.shippedAt && currentTime().getTime() - new Date(o.shippedAt).getTime() < 86400000));
     return {
       skus: skuSet.size,
       units,
       pending: pending.length,
       incoming: incoming.length,
-      incomingToday: incoming.filter((s) => s.expectedAt.slice(0, 10) === REFERENCE_NOW.toISOString().slice(0, 10)).length,
+      incomingToday: incoming.filter((s) => s.expectedAt.slice(0, 10) === currentTime().toISOString().slice(0, 10)).length,
       outgoing: outgoing.length,
       ready: orders.filter((o) => o.status === "ready_to_ship").length,
       low: lowSkus.size,
@@ -59,6 +64,8 @@ export function DashboardView() {
     };
   }, [inventory, orders, inbound]);
 
+  const hasHistory = metrics.length >= 14;
+  const delta = (key: Parameters<typeof periodDelta>[1], mode?: "sum" | "avg") => (hasHistory ? periodDelta(metrics, key, 7, mode) : undefined);
   const trend = (key: "stockOnHand" | "ordersReceived" | "inbound" | "outbound") => metrics.slice(-21).map((d) => d[key]);
 
   const categoryData = React.useMemo(() => {
@@ -113,7 +120,7 @@ export function DashboardView() {
         } else e.pickLoc = r.locationCode;
         seen.set(r.productId, e);
       });
-    const scale = warehouse.id === "WH-ATL" ? 1 : warehouse.id === "WH-DAL" ? 0.55 : 0.42;
+    const scale = warehouse.stockLevelFactor;
     return [...seen.values()]
       .map((e) => {
         const p = products.find((x) => x.id === e.productId);
@@ -122,28 +129,24 @@ export function DashboardView() {
       })
       .sort((a, b) => a.cover - b.cover)
       .slice(0, 7);
-  }, [inventory, products, warehouse.id]);
+  }, [inventory, products, warehouse.stockLevelFactor]);
 
   const onShift = employees.filter((e) => e.status === "on_shift" || e.status === "on_break");
   const feed = (actTab === "alerts" ? activity.filter((a) => a.severity === "warning" || a.severity === "critical") : activity).slice(0, 8);
 
-  const replenish = (item: (typeof lowStock)[number]) => {
+  const replenish = async (item: (typeof lowStock)[number]) => {
     if (!item.reserveLoc) return;
     const qty = Math.min(item.reserveQty, Math.max(item.min * 2 - item.total, 1));
-    const id = `TR-${32000 + Math.floor(Math.random() * 900)}`;
-    actions.createTransfer({
-      id,
-      warehouseId: warehouse.id,
+    const res = await actions.createTransfer({
       type: "replenishment",
       fromLocation: item.reserveLoc,
       toLocation: item.pickLoc,
-      lines: [{ productId: item.productId, sku: item.sku, productName: item.name, quantity: qty }],
-      status: "requested",
-      requestedBy: CURRENT_USER.name,
-      createdAt: nowIso(),
+      productId: item.productId,
+      quantity: qty,
       reason: "Pick face below min",
     });
-    toast.success(`Replenishment ${id} created`, { description: `${qty} × ${item.sku} from ${item.reserveLoc}`, action: { label: "View", onClick: () => (window.location.href = "/transfers") } });
+    if (!res) return;
+    toast.success(`Replenishment ${res.id} created`, { description: `${qty} × ${item.sku} from ${item.reserveLoc}`, action: { label: "View", onClick: () => (window.location.href = "/transfers") } });
   };
 
   const exportSnapshot = () => {
@@ -158,8 +161,8 @@ export function DashboardView() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title={`${greeting()}, ${CURRENT_USER.name.split(" ")[0]}`}
-        description={`${warehouse.name} · Morning shift · ${onShift.length} operators on the floor`}
+        title={`${greeting()}, ${user?.name.split(" ")[0] ?? ""}`}
+        description={`${warehouse.name} · ${shiftName()} · ${onShift.length} operator${onShift.length === 1 ? "" : "s"} on the floor`}
         actions={
           <>
             <DateRangePicker value={range} onChange={setRange} />
@@ -175,10 +178,10 @@ export function DashboardView() {
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <KpiCard label="Total SKUs" value={formatNumber(kpi.skus)} icon={Tags} href="/products" footer={<span className="text-muted-foreground">active in {warehouse.id}</span>} />
-        <KpiCard label="Stock units" value={formatCompact(kpi.units)} icon={Boxes} delta={periodDelta(metrics, "stockOnHand", 7, "avg")} trend={trend("stockOnHand")} href="/inventory" />
-        <KpiCard label="Pending orders" value={kpi.pending} icon={ClipboardList} delta={periodDelta(metrics, "ordersReceived")} positiveIsGood={false} href="/orders" />
-        <KpiCard label="Incoming shipments" value={kpi.incoming} icon={PackageOpen} delta={periodDelta(metrics, "inbound")} trend={trend("inbound")} href="/inbound" />
-        <KpiCard label="Outgoing shipments" value={kpi.outgoing} icon={Truck} delta={periodDelta(metrics, "outbound")} trend={trend("outbound")} href="/outbound" />
+        <KpiCard label="Stock units" value={formatCompact(kpi.units)} icon={Boxes} delta={delta("stockOnHand", "avg")} trend={hasHistory ? trend("stockOnHand") : undefined} href="/inventory" />
+        <KpiCard label="Pending orders" value={kpi.pending} icon={ClipboardList} delta={delta("ordersReceived")} positiveIsGood={false} href="/orders" />
+        <KpiCard label="Incoming shipments" value={kpi.incoming} icon={PackageOpen} delta={delta("inbound")} trend={hasHistory ? trend("inbound") : undefined} href="/inbound" />
+        <KpiCard label="Outgoing shipments" value={kpi.outgoing} icon={Truck} delta={delta("outbound")} trend={hasHistory ? trend("outbound") : undefined} href="/outbound" />
         <KpiCard label="Low stock alerts" value={kpi.low} icon={AlertTriangle} tone={kpi.out ? "danger" : "warning"} href="/inventory?status=low_stock" footer={<span className="text-muted-foreground">{kpi.out} out of stock · {kpi.low - kpi.out} below min</span>} />
       </div>
 

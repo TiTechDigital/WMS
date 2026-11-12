@@ -1,79 +1,146 @@
 # Halden WMS
 
-Frontend foundation for a next-generation warehouse management system: an enterprise SaaS UI for distribution centers, 3PLs and manufacturing warehouses.
+A full-stack warehouse management system for distribution centers, 3PLs and manufacturing warehouses: inventory, locations, inbound receiving, outbound fulfillment, picking and packing, transfers, adjustments, reporting and user management.
 
-This phase covers the visual identity, navigation, all main modules, interactive workflows and realistic seeded data. There is no backend yet. Every screen runs on a client-side store built so an API can replace it module by module.
+It's one Next.js app containing both the web UI and the REST API, backed by **PostgreSQL**. **To run it, you only need to connect a database.**
 
-## Getting started
+---
+
+## 1. Connect a database and run it
+
+**Requirements:** Node.js 20+ and a PostgreSQL 14+ database. Any provider works: [Neon](https://neon.tech), [Supabase](https://supabase.com), Vercel Postgres (via the Vercel Marketplace), AWS RDS, or local Postgres.
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000  → redirects to /dashboard
-npm run build      # production build (all routes prerender statically)
-npm run typecheck
+cp .env.example .env          # then fill in the values (see below)
+npm run db:deploy             # creates all tables
 ```
 
-## Stack
+Then choose **one** of these:
 
-Next.js 15 (App Router) · TypeScript · Tailwind CSS · shadcn/ui-style components on Radix primitives · Lucide icons · Recharts · TanStack Table v8 · Sonner toasts · Geist fonts.
+```bash
+# A) Demo data: 3 sites, ~100 SKUs, orders, shipments and 49 user accounts
+npm run db:seed
 
-## Modules
+# B) A clean production start: no demo data, just your first administrator and site
+npm run db:create-admin -- --login admin --email you@company.com --name "Your Name" \
+  --password "choose-a-long-password" --site WH-MXP --site-name "Milano Malpensa DC" \
+  --city Milan --timezone Europe/Rome
+```
 
-| Section | Route | Highlights |
+Then start the app:
+
+```bash
+npm run dev                   # http://localhost:3000
+```
+
+### Environment variables
+
+| Variable | What it is |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string used by the app. On hosted providers use the **pooled** URL. |
+| `DIRECT_URL` | Direct (non-pooled) URL used only for migrations. If you have only one URL, use the same value. |
+| `AUTH_SECRET` | Signs session cookies. At least 32 random characters: `openssl rand -base64 48`. |
+| `SEED_ADMIN_PASSWORD`, `SEED_USER_PASSWORD` | Only for `npm run db:seed` (demo accounts). |
+
+### Demo accounts (after `db:seed`)
+
+| Sign-in ID | Password | Role |
 |---|---|---|
-| Overview | `/dashboard` | 6 KPIs, inventory movement, in vs out, category distribution, fulfilment, capacity by zone, pending inbound, orders awaiting pick, low stock with one-click replenishment, activity feed, workforce on shift |
-| | `/analytics` | Turnover, accuracy, fulfilment rate, pick time, utilization and volume, with date range, interval and previous-period comparison |
-| Operations | `/inventory` | Searchable, sortable, faceted table; status chips; product drawer (locations, network stock, details, history); bulk cycle counts; CSV export |
-| | `/products` | Table and grid views; add/edit form with validation, image upload, SKU and EAN-13 generation; duplicate and discontinue |
-| | `/locations` | Interactive floor plan (docks, staging, pick racks, pallet racks, bulk lanes, cold storage) shaded by occupancy, with SKU locate; location list; block or activate |
-| | `/inbound` | Expected → Arrived → Receiving → QC → Putaway → Completed pipeline; line-level receiving with discrepancies; new ASN; completed receipts post stock to inventory |
-| | `/outbound` | New → Allocated → Picking → Packing → Ready → Shipped pipeline; wave release; carrier cut-offs with manifest close |
-| | `/picking` | RF-style pick console (scan location, then item), short pick and skip; pack station with item verification and carton selection |
-| | `/transfers`, `/adjustments` | Create, dispatch and complete transfers (stock actually moves); adjustments with approval workflow |
-| Management | `/orders`, `/suppliers`, `/customers`, `/employees` | Order management with drawer and new-order entry; partner and workforce directories with detail drawers and add dialogs |
-| System | `/reports`, `/activity`, `/settings` | Reports that generate real CSVs from live data, plus scheduling; full audit log; organization, sites, roles, notifications, integrations and profile settings |
+| `admin` | `SEED_ADMIN_PASSWORD` | Administrator (all sites, users, settings) |
+| Any employee badge, e.g. `ATL-1040` | `SEED_USER_PASSWORD` | Based on job: manager, supervisor or operator |
 
-Global features: site switcher (Atlanta, Dallas, Reno; all data is scoped per site), command palette (`⌘K`, also accepts scanner input), notifications panel, user menu, keyboard shortcuts (`?`, `[`, `g d`, `g i`, …), collapsible sidebar, and a responsive layout down to phone width.
+Operators see only their home site. **Change these passwords** before showing the app to anyone.
 
-## Architecture
+---
 
+## 2. Deploy to Vercel
+
+1. Create a PostgreSQL database (e.g. Neon from Vercel → Storage → Marketplace).
+2. In **Vercel → Project → Settings → Environment Variables**, add `DATABASE_URL`, `DIRECT_URL` and `AUTH_SECRET`.
+3. Deploy. The `vercel-build` script runs `prisma migrate deploy` automatically, so tables are created and kept up to date on every deploy.
+4. Create your first administrator **once**, from your computer, pointing at the production database:
+   ```bash
+   DATABASE_URL="…" DIRECT_URL="…" npm run db:create-admin -- --login admin --email you@company.com --name "Your Name" --password "…"
+   ```
+5. Sign in at `https://your-app.vercel.app/login`, then build your layout in **Locations → Add locations** and add people in **Settings → Users & roles**.
+
+> Never run `db:seed` against production: it deletes all data. The script refuses to run when `NODE_ENV=production` unless `ALLOW_PRODUCTION_SEED=true`.
+
+---
+
+## 3. What's included
+
+### Backend
+- **REST API** in `src/app/api/**`, more than 30 endpoints. Every input is validated with zod, every action checks permissions, every change runs in a database transaction and writes an audit log entry.
+- **Business logic** in `src/server/services`:
+  - **Receiving:** advances ASN → arrival → receiving → QC → putaway → completion. Completing a receipt **posts stock to inventory**.
+  - **Orders:** allocation creates pick tasks; picking, packing and shipping update order lines.
+  - **Picking:** scan-to-confirm per line; completing the last line moves the order to packing.
+  - **Transfers:** completing one **moves stock** between locations.
+  - **Adjustments:** approval workflow; approved adjustments **change stock**.
+  - **Stock status:** recomputed automatically against min/max per site.
+  - **Document numbers** (SO, ASN, PK, TR, ADJ) come from atomic counters.
+- **Authentication:**
+  - employee ID or email plus password, hashed with bcrypt,
+  - 12-hour signed session cookie (HTTP-only),
+  - login throttling,
+  - middleware that protects every page and API route.
+- **Roles:** admin, manager, supervisor, operator (`src/lib/permissions.ts`). The server enforces them; the UI hides what a role can't do. Operators are limited to their home site.
+
+### Frontend
+Seventeen modules: Dashboard, Analytics, Inventory, Products, Locations (floor plan plus a layout builder), Inbound, Outbound, Picking & Packing (scanner-style console and pack station), Transfers, Adjustments, Orders, Suppliers, Customers, Employees, Reports (CSV export and schedules), Activity log and Settings (organization, sites, users, notifications, integrations, profile and password).
+
+The UI targets WCAG 2.2 AA. It has keyboard support, screen-reader labels, 24px+ targets and reduced-motion support, and works down to phone width.
+
+### Project layout
 ```
+prisma/
+  schema.prisma          database schema (PostgreSQL)
+  migrations/            SQL migrations
+  seed.ts                demo data
+  create-admin.ts        first administrator for a clean install
 src/
-  app/(app)/<module>/page.tsx   thin server pages (metadata) that render a module view
-  components/
-    ui/                         design-system primitives (button, dialog, sheet, tabs, select…)
-    layout/                     app shell: sidebar, topbar, command palette, notifications
-    data-table/                 generic TanStack table: search, facets, sort, paging, selection, export
-    charts/                     chart kit (validated palette, tooltip, legend), trend and sparkline charts
-    shared/                     page header, KPI card, stage flow, date range picker, SKU picker…
-    modules/<module>/           feature views, drawers and dialogs
-  data/                         deterministic seeded mock data (products, locations, orders…)
-  store/wms-store.tsx           client store and domain actions (receive, pick, approve, transfer…)
-  types/                        domain model
-  lib/                          formatting, status maps, navigation, metrics, CSV
-  hooks/                        local storage, hotkeys, URL query flags
+  app/(app)/…            pages (signed-in area)
+  app/login/             sign-in page
+  app/api/…              REST API route handlers
+  middleware.ts          authentication gate
+  server/                server-only code: db client, auth, validation, services, serializers
+  store/wms-store.tsx    client store: loads data from the API, calls API actions
+  components/            UI (design system, layout, modules)
+  lib/                   shared helpers (permissions, formatting, status maps)
+  types/                 domain types shared by client and server
 ```
 
-### Integrating a backend later
+### Useful scripts
 
-- **All mutations go through store actions** (`useWms().actions.*`). Pages never edit data directly. To connect an API, keep the action signatures and implement them with fetch, server actions or React Query mutations.
-- **Reads are already scoped**: `useWms()` exposes site-filtered collections. These can become query hooks per module, one module at a time.
-- **The seed data is deterministic** (seeded PRNG plus a fixed reference time in `lib/constants.ts`), so server and client renders match. When live data arrives, replace `REFERENCE_NOW` with the real clock.
-- **The domain types in `src/types`** map directly to future database tables and API DTOs.
-- **Barcode scanning**: the pick console and command palette already handle keyboard-wedge scanner input (scan then Enter), so hardware scanners work without extra integration.
+| Script | Purpose |
+|---|---|
+| `npm run dev` | Development server |
+| `npm run build` / `npm start` | Production build / server |
+| `npm run db:migrate` | Create a new migration after editing `schema.prisma` (development) |
+| `npm run db:deploy` | Apply migrations (production) |
+| `npm run db:seed` | Reset and load demo data (**deletes everything**) |
+| `npm run db:create-admin` | Create or reset an administrator |
+| `npm run db:studio` | Browse the database in Prisma Studio |
+| `npm run typecheck` | TypeScript check |
 
-## Accessibility and UI quality
+### Health check
+`GET /api/health` returns `{ ok: true, database: "connected" }` when the app can reach the database.
 
-The UI targets **WCAG 2.2 AA** and is checked with an automated audit (contrast, labels, headings, landmarks, target size, 375px overflow, reduced motion, console errors) on all 17 pages, plus a scripted keyboard walk-through. What's in place:
+---
 
-- **Keyboard:** skip link, focus moves to the page heading after navigation, table rows open with Enter, and focus returns to the row when a drawer closes.
-- **Tables:** caption, column scope, `aria-sort`, search with an accessible name, and live announcements of result and selection counts.
-- **Forms:** the `Field` component links each label, hint and error to its control and sets `aria-invalid` automatically (`src/components/ui/field-context.ts`).
-- **Color:** status text tokens (`*-text`) keep badges at or above 4.5:1. Status is never shown by color alone.
-- **Targets:** at least 24×24px, including checkboxes, switches and floor-plan cells.
-- **Motion and hover:** `prefers-reduced-motion` is respected globally; hover styles apply only on devices that can hover.
-- **Bulk and irreversible actions:** releasing waves, closing manifests, approving adjustments, blocking locations and cancelling all go through a confirmation that previews the affected records (`src/components/shared/confirm-dialog.tsx`).
-- **Dashboard:** leads with a "Needs attention" strip that links to the filtered queues.
-- **Dates:** day-first and unambiguous (`06 Nov 2026`); all times are UTC.
+## 4. Production checklist (not yet built)
 
-Not yet verified: screen-reader testing on a real assistive technology (VoiceOver, NVDA) and Windows forced-colors mode.
+The core system works end to end. These need external services or decisions before real-world rollout:
+
+| Area | What's needed |
+|---|---|
+| **Scheduled reports by email** | Schedules are saved. Delivery needs an email provider (Resend, Postmark, SES) and a cron job (Vercel Cron) that runs due schedules. |
+| **Daily metrics** | Charts on Dashboard and Analytics read the `DailyMetric` table, which only the demo seed fills. Add a nightly job that aggregates the day's receipts, shipments and orders into it. |
+| **Integrations** | The Settings switches record intent only. ERP, Shopify, EDI and carrier (UPS/FedEx) connectors need their own adapters and credentials. |
+| **Product images** | Stored as data URLs in the database (up to 2 MB). Move to object storage (Vercel Blob, S3, R2) at scale. |
+| **Login throttling** | Per server instance. Use a shared store (Upstash Redis) for multi-instance deployments. |
+| **Large datasets** | The app loads a site's data on sign-in. That's fine for tens of thousands of records; beyond that, switch big tables to server-side pagination (the API layer is ready for it). |
+| **Notifications** | Demo notifications are seeded. Generating them from live events (stock-outs, late orders) is a small job that inserts into the `Notification` table. |
+| **Backups and monitoring** | Turn on your database provider's automatic backups and add error monitoring (e.g. Sentry). |

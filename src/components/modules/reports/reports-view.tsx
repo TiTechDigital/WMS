@@ -3,7 +3,7 @@
 import * as React from "react";
 import { CalendarClock, Clock, Download, FileSpreadsheet, Play, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { useWms, nowIso, CURRENT_USER } from "@/store/wms-store";
+import { useWms, nowIso } from "@/store/wms-store";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { REPORTS, type ReportDef, type ReportRow } from "./report-catalog";
 import { downloadCsv } from "@/lib/csv";
 import { formatDateTime, formatRelative } from "@/lib/format";
-import { REFERENCE_NOW } from "@/lib/constants";
+import { currentTime } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 type Run = { id: string; reportId: string; at: string; rows: number; by: string; site: string; data: ReportRow[] };
@@ -31,11 +31,8 @@ export function ReportsView() {
   const { warehouse, actions } = store;
   const [cat, setCat] = React.useState<(typeof CATS)[number]>("All");
   const [runs, setRuns] = React.useState<Run[]>([]);
-  const [schedules, setSchedules] = React.useState<Schedule[]>([
-    { id: "sch_1", reportId: "reorder", frequency: "Daily", time: "06:00", recipients: "purchasing@northstar-logistics.com", enabled: true },
-    { id: "sch_2", reportId: "kpi", frequency: "Weekly · Mon", time: "07:30", recipients: "ops-leadership@northstar-logistics.com", enabled: true },
-    { id: "sch_3", reportId: "adjustments", frequency: "Monthly · 1st", time: "08:00", recipients: "finance@northstar-logistics.com", enabled: false },
-  ]);
+  const schedules = store.reportSchedules;
+  const canSchedule = store.can("reports.schedule");
   const [scheduling, setScheduling] = React.useState<ReportDef | null>(null);
   const [preview, setPreview] = React.useState<Run | null>(null);
 
@@ -44,7 +41,7 @@ export function ReportsView() {
 
   const run = (r: ReportDef) => {
     const data = r.build(store);
-    const entry: Run = { id: `run_${Date.now()}`, reportId: r.id, at: nowIso(), rows: data.length, by: CURRENT_USER.name, site: warehouse.id, data };
+    const entry: Run = { id: `run_${Date.now()}`, reportId: r.id, at: nowIso(), rows: data.length, by: store.user?.name ?? "", site: warehouse.id, data };
     setRuns((prev) => [entry, ...prev].slice(0, 20));
     actions.log({ module: "System", action: "Report generated", entity: r.name, details: `${data.length} rows · ${warehouse.id}`, severity: "info" });
     setPreview(entry);
@@ -95,9 +92,9 @@ export function ReportsView() {
               <div className="mt-auto flex items-center justify-between pt-4">
                 <span className="text-2xs text-muted-foreground">{last ? `Last run ${formatRelative(last.at)}` : "Not run this session"}</span>
                 <div className="flex gap-1.5">
-                  <Button size="sm" variant="ghost" onClick={() => setScheduling(r)}>
+                  {canSchedule && <Button size="sm" variant="ghost" onClick={() => setScheduling(r)}>
                     <Clock /> Schedule
-                  </Button>
+                  </Button>}
                   <Button size="sm" variant="secondary" onClick={() => run(r)}>
                     <Play /> Run
                   </Button>
@@ -110,14 +107,15 @@ export function ReportsView() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card>
-          <CardHeader title="Scheduled reports" description="Delivered by email as CSV attachments" />
+          <CardHeader title="Scheduled reports" description="Saved schedules. Email delivery needs an email provider and a scheduled job — see README." />
           <div className="divide-y">
             {schedules.map((s) => (
               <div key={s.id} className="flex items-center gap-3 px-4 py-3">
                 <Switch
                   checked={s.enabled}
-                  onCheckedChange={(v) => {
-                    setSchedules((prev) => prev.map((x) => (x.id === s.id ? { ...x, enabled: v } : x)));
+                  disabled={!canSchedule}
+                  onCheckedChange={async (v) => {
+                    if (!(await actions.updateSchedule(s.id, v))) return;
                     toast.success(v ? "Schedule enabled" : "Schedule paused", { description: name(s.reportId) });
                   }}
                   aria-label="Enabled"
@@ -132,9 +130,9 @@ export function ReportsView() {
                   variant="ghost"
                   size="icon-sm"
                   aria-label="Delete schedule"
-                  onClick={() => {
-                    setSchedules((prev) => prev.filter((x) => x.id !== s.id));
-                    toast.success("Schedule removed");
+                  disabled={!canSchedule}
+                  onClick={async () => {
+                    if (await actions.deleteSchedule(s.id)) toast.success("Schedule removed");
                   }}
                 >
                   <Trash2 />
@@ -219,8 +217,8 @@ export function ReportsView() {
       <ScheduleDialog
         report={scheduling}
         onOpenChange={(o) => !o && setScheduling(null)}
-        onSave={(s) => {
-          setSchedules((prev) => [s, ...prev]);
+        onSave={async (s) => {
+          if (!(await actions.createSchedule(s))) return;
           toast.success("Report scheduled", { description: `${name(s.reportId)} · ${s.frequency} at ${s.time}` });
           setScheduling(null);
         }}
@@ -229,20 +227,22 @@ export function ReportsView() {
   );
 }
 
-function ScheduleDialog({ report, onOpenChange, onSave }: { report: ReportDef | null; onOpenChange: (v: boolean) => void; onSave: (s: Schedule) => void }) {
+function ScheduleDialog({ report, onOpenChange, onSave }: { report: ReportDef | null; onOpenChange: (v: boolean) => void; onSave: (s: Omit<Schedule, "id" | "enabled">) => Promise<void> }) {
+  const { user } = useWms();
+  const myEmail = user?.email ?? "";
   const [frequency, setFrequency] = React.useState("Daily");
   const [time, setTime] = React.useState("06:00");
-  const [recipients, setRecipients] = React.useState(CURRENT_USER.email);
+  const [recipients, setRecipients] = React.useState(myEmail);
   const [error, setError] = React.useState<string | null>(null);
   React.useEffect(() => {
     if (report) {
       setFrequency("Daily");
       setTime("06:00");
-      setRecipients(CURRENT_USER.email);
+      setRecipients(myEmail);
       setError(null);
     }
   }, [report]);
-  const firstRun = new Date(REFERENCE_NOW.getTime() + 86400000).toISOString().slice(0, 10);
+  const firstRun = new Date(currentTime().getTime() + 86400000).toISOString().slice(0, 10);
   return (
     <Dialog open={!!report} onOpenChange={onOpenChange}>
       <DialogContent size="sm">
@@ -252,7 +252,7 @@ function ScheduleDialog({ report, onOpenChange, onSave }: { report: ReportDef | 
             e.preventDefault();
             const emails = recipients.split(/[,;\s]+/).filter(Boolean);
             if (!emails.length || emails.some((m) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m))) return setError("Enter one or more valid email addresses.");
-            onSave({ id: `sch_${Date.now()}`, reportId: report!.id, frequency, time, recipients: emails.join(", "), enabled: true });
+            void onSave({ reportId: report!.id, frequency, time, recipients: emails.join(", ") });
           }}
         >
           <DialogHeader>

@@ -4,7 +4,7 @@ import * as React from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowRight, Ban, Check, MoreHorizontal, Plus, Truck } from "lucide-react";
 import { toast } from "sonner";
-import { useWms, nowIso, CURRENT_USER } from "@/store/wms-store";
+import { useWms } from "@/store/wms-store";
 import { PageHeader } from "@/components/shared/page-header";
 import { DataTable, inArrayFilter } from "@/components/data-table/data-table";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,6 @@ import { useQueryFlag } from "@/hooks/use-query-flag";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { TRANSFER_STATUS } from "@/lib/status";
 import { formatDateTime, formatNumber, formatRelative } from "@/lib/format";
-import { WAREHOUSES } from "@/lib/constants";
 import type { Product, StockTransfer } from "@/types";
 
 const TYPE_LABEL: Record<StockTransfer["type"], string> = { replenishment: "Replenishment", internal: "Internal move", "inter-warehouse": "Inter-warehouse" };
@@ -35,8 +34,8 @@ export function TransfersView() {
   useQueryFlag("new", () => setOpen(true));
 
   const rows = React.useMemo<Row[]>(() => transfers.map((t) => ({ ...t, qty: t.lines.reduce((s, l) => s + l.quantity, 0), sku: t.lines[0]?.sku ?? "" })), [transfers]);
-  const step = (t: Row, status: StockTransfer["status"]) => {
-    actions.setTransferStatus(t.id, status);
+  const step = async (t: Row, status: "requested" | "in_transit" | "completed" | "cancelled") => {
+    if (!(await actions.setTransferStatus(t.id, status))) return;
     toast.success(`${t.id} → ${TRANSFER_STATUS[status].label}`, { description: status === "completed" ? "Stock moved between locations" : undefined });
   };
 
@@ -176,7 +175,9 @@ export function TransfersView() {
 }
 
 function NewTransferDialog({ open, onOpenChange, presetSku }: { open: boolean; onOpenChange: (v: boolean) => void; presetSku?: string }) {
-  const { products, inventory, locations, warehouse, transfers, actions } = useWms();
+  const { products, inventory, locations, warehouse, warehouses, actions } = useWms();
+  const otherSites = warehouses.filter((w) => w.id !== warehouse.id);
+  const [saving, setSaving] = React.useState(false);
   const [type, setType] = React.useState<StockTransfer["type"]>("internal");
   const [product, setProduct] = React.useState<Product | undefined>();
   const [from, setFrom] = React.useState("");
@@ -198,7 +199,7 @@ function NewTransferDialog({ open, onOpenChange, presetSku }: { open: boolean; o
     setProduct(p);
     setFrom("");
     setTo("");
-    setToWh(WAREHOUSES.find((w) => w.id !== warehouse.id)!.id);
+    setToWh(otherSites[0]?.id ?? "");
     setQty("");
     setReason("");
     setError(null);
@@ -209,30 +210,28 @@ function NewTransferDialog({ open, onOpenChange, presetSku }: { open: boolean; o
   const freeLocs = locations.filter((l) => (l.type === "pick-bin" || l.type === "pallet" || l.type === "cold" || l.type === "bulk") && l.status === "active" && l.code !== from);
   const suggested = product ? inventory.filter((r) => r.productId === product.id && r.locationCode !== from).map((r) => r.locationCode) : [];
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!product) return setError("Select a product.");
     if (!src) return setError("Select a source location.");
-    const destination = type === "inter-warehouse" ? `${toWh.slice(3)}-R-STG-01` : to;
+    if (type === "inter-warehouse" && !toWh) return setError("No other site is available for an inter-warehouse transfer.");
+    const destination = type === "inter-warehouse" ? `${toWh.replace(/^WH-/, "")}-R-STG-01` : to;
     if (!destination) return setError("Select a destination location.");
     const n = Number(qty);
     if (!(n > 0)) return setError("Enter a quantity.");
     if (n > src.available) return setError(`Only ${src.available} units available at ${src.locationCode}.`);
-    const max = Math.max(...transfers.map((t) => Number(t.id.replace("TR-", "")) || 0), 31800);
-    const t: StockTransfer = {
-      id: `TR-${max + 3}`,
-      warehouseId: warehouse.id,
+    setSaving(true);
+    const res = await actions.createTransfer({
       type,
       fromLocation: src.locationCode,
       toLocation: destination,
-      lines: [{ productId: product.id, sku: product.sku, productName: product.name, quantity: n }],
-      status: "requested",
-      requestedBy: CURRENT_USER.name,
-      createdAt: nowIso(),
+      productId: product.id,
+      quantity: n,
       reason: reason.trim() || (type === "replenishment" ? "Pick face below min" : type === "inter-warehouse" ? "Rebalance network stock" : "Slotting optimisation"),
-    };
-    actions.createTransfer(t);
-    toast.success(`${t.id} requested`, { description: `${n} × ${product.sku} · ${t.fromLocation} → ${t.toLocation}` });
+    });
+    setSaving(false);
+    if (!res) return;
+    toast.success(`${res.id} requested`, { description: `${n} × ${product.sku} · ${src.locationCode} → ${destination}` });
     onOpenChange(false);
   };
 
@@ -278,7 +277,7 @@ function NewTransferDialog({ open, onOpenChange, presetSku }: { open: boolean; o
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {WAREHOUSES.filter((w) => w.id !== warehouse.id).map((w) => (
+                      {otherSites.map((w) => (
                         <SelectItem key={w.id} value={w.id}>
                           {w.name}
                         </SelectItem>
@@ -328,7 +327,7 @@ function NewTransferDialog({ open, onOpenChange, presetSku }: { open: boolean; o
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit">Request transfer</Button>
+            <Button type="submit" disabled={saving}>{saving ? "Requesting…" : "Request transfer"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

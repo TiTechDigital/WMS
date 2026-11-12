@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Lock } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { Sidebar, SidebarNav, WarehouseSwitcher } from "./sidebar";
 import { Topbar } from "./topbar";
 import { CommandPalette } from "./command-palette";
@@ -11,10 +11,9 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
-import { Avatar } from "@/components/ui/avatar";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useHotkey } from "@/hooks/use-hotkey";
-import { CURRENT_USER } from "@/store/wms-store";
+import { useWms } from "@/store/wms-store";
 
 const SHORTCUTS: [string, string[]][] = [
   ["Open search / scan", ["⌘", "K"]],
@@ -34,7 +33,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [mobileNav, setMobileNav] = React.useState(false);
   const [shortcuts, setShortcuts] = React.useState(false);
-  const [locked, setLocked] = React.useState(false);
+  const { status, loadError, actions } = useWms();
   const pendingG = React.useRef(false);
   const pathname = usePathname();
   const mainRef = React.useRef<HTMLElement>(null);
@@ -107,10 +106,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           onOpenSearch={() => setSearchOpen(true)}
           onOpenMobileNav={() => setMobileNav(true)}
           onOpenShortcuts={() => setShortcuts(true)}
-          onSignOut={() => setLocked(true)}
+          onSignOut={() => void actions.signOut()}
         />
-        <main id="main" ref={mainRef} tabIndex={-1} className="flex-1 px-4 py-5 outline-none lg:px-6 [&_h1:focus]:outline-none">
-          {children}
+        <main id="main" ref={mainRef} tabIndex={-1} className="flex-1 px-4 py-5 outline-none lg:px-6 [&_h1:focus]:outline-none" aria-busy={status === "loading"}>
+          {status === "ready" ? (
+            children
+          ) : status === "loading" ? (
+            <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-[13px] text-muted-foreground" role="status">
+              <Loader2 className="size-5 animate-spin" aria-hidden />
+              Loading warehouse data…
+            </div>
+          ) : (
+            <div className="flex min-h-[60vh] flex-col items-center justify-center text-center" role="alert">
+              <span className="mb-3 flex size-10 items-center justify-center rounded-lg bg-danger-soft text-danger-text">
+                <AlertTriangle className="size-4" aria-hidden />
+              </span>
+              <h1 className="text-sm font-semibold">Couldn&apos;t load warehouse data</h1>
+              <p className="mt-1 max-w-sm text-xs text-muted-foreground">{loadError}</p>
+              <Button className="mt-4" onClick={() => void actions.reload()}>
+                Try again
+              </Button>
+            </div>
+          )}
         </main>
       </div>
 
@@ -137,27 +154,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </DialogContent>
       </Dialog>
 
-      {locked && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/95 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-lg border bg-surface p-6 text-center shadow-pop">
-            <div className="mx-auto mb-4 flex size-10 items-center justify-center rounded-full bg-accent">
-              <Lock className="size-4 text-muted-foreground" />
-            </div>
-            <h2 className="text-sm font-semibold">You have been signed out</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Your session was closed on this device. Any unsaved scanner input has been discarded.</p>
-            <div className="mt-5 flex items-center gap-2.5 rounded-md border bg-subtle p-2.5 text-left">
-              <Avatar name={CURRENT_USER.name} />
-              <div className="min-w-0">
-                <div className="text-[13px] font-medium">{CURRENT_USER.name}</div>
-                <div className="truncate text-xs text-muted-foreground">{CURRENT_USER.email}</div>
-              </div>
-            </div>
-            <Button className="mt-4 w-full" onClick={() => setLocked(false)}>
-              Sign back in
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

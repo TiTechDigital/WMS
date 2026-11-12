@@ -26,6 +26,7 @@ export function PackStation() {
   const order = queue.find((o) => o.id === selectedId) ?? queue[0];
   const [checked, setChecked] = React.useState<Set<number>>(new Set());
   const [carton, setCarton] = React.useState("M");
+  const [busy, setBusy] = React.useState(false);
 
   React.useEffect(() => {
     setChecked(new Set());
@@ -124,10 +125,13 @@ export function PackStation() {
               <Button
                 size="xl"
                 className="w-full"
-                disabled={!all}
-                onClick={() => {
-                  actions.setOrderStatus(order.id, "ready_to_ship");
-                  actions.log({ module: "Outbound", action: "Shipping label printed", entity: order.id, details: `${order.carrier} ${order.service} · carton ${carton}`, severity: "info" });
+                disabled={!all || busy}
+                onClick={async () => {
+                  setBusy(true);
+                  const ok = await actions.packOrder(order.id);
+                  setBusy(false);
+                  if (!ok) return;
+                  void actions.log({ module: "Outbound", action: "Shipping label printed", entity: order.id, details: `${order.carrier} ${order.service} · carton ${carton}`, severity: "info" });
                   toast.success(`${order.id} packed`, { description: `Label printed · moved to Ready to ship` });
                   setSelectedId(null);
                 }}

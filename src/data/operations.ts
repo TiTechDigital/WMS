@@ -16,12 +16,12 @@ import type {
   AdjustmentReason,
   TransferStatus,
 } from "@/types";
-import { REFERENCE_NOW, WAREHOUSES, type WarehouseId } from "@/lib/constants";
+import { currentTime, WAREHOUSES, type WarehouseId } from "@/lib/constants";
 import { createRng } from "@/lib/random";
 
 const HOUR = 3600000;
 const DAY = 24 * HOUR;
-const at = (offsetMs: number) => new Date(REFERENCE_NOW.getTime() + offsetMs).toISOString();
+const at = (offsetMs: number) => new Date(currentTime().getTime() + offsetMs).toISOString();
 const roundTo = (ms: number, step: number) => Math.round(ms / step) * step;
 
 const INBOUND_CARRIERS = ["XPO Logistics", "Old Dominion", "Estes Express", "Saia LTL", "J.B. Hunt", "Maersk Line", "R+L Carriers"];
@@ -217,7 +217,7 @@ export function generatePickTasks(orders: Order[], employees: Employee[], produc
         priority: o.priority,
         status,
         createdAt: o.createdAt,
-        startedAt: status !== "queued" ? at(new Date(o.createdAt).getTime() - REFERENCE_NOW.getTime() + rng.int(20, 120) * 60000) : undefined,
+        startedAt: status !== "queued" ? at(new Date(o.createdAt).getTime() - currentTime().getTime() + rng.int(20, 120) * 60000) : undefined,
         dueAt: o.requestedShipAt,
         cart: status !== "queued" ? `CART-${rng.int(10, 48)}` : undefined,
         lines: [...o.lines]

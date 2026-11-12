@@ -83,8 +83,15 @@ function RackZone({ zone, locs, onSelect, highlight }: { zone: Zone; locs: Locat
               {racks.map((r) => (
                 <div key={r} className="flex flex-1 flex-col gap-[3px] rounded-[4px] border border-border/70 bg-surface p-[3px]">
                   {levels.map((lv) => {
-                    const l = locs.find((x) => x.aisle === a && x.rack === r && x.shelf === lv);
-                    return l ? <Cell key={lv} l={l} onSelect={onSelect} highlight={highlight} className="h-6 w-full" /> : null;
+                    const bins = locs.filter((x) => x.aisle === a && x.rack === r && x.shelf === lv).sort((x, y) => x.bin.localeCompare(y.bin));
+                    if (!bins.length) return null;
+                    return (
+                      <div key={lv} className="flex gap-[3px]">
+                        {bins.map((l) => (
+                          <Cell key={l.id} l={l} onSelect={onSelect} highlight={highlight} className="h-6 min-w-0 flex-1" />
+                        ))}
+                      </div>
+                    );
                   })}
                 </div>
               ))}
@@ -127,11 +134,15 @@ function ZoneLabel({ zone, pct, count }: { zone: Zone; pct: number; count: numbe
 
 export function WarehouseMap({ locations, zones, onSelect, highlight }: { locations: Location[]; zones: Zone[]; onSelect: (l: Location) => void; highlight: Set<string> | null }) {
   const byZone = (code: string) => locations.filter((l) => l.zone === code);
-  const z = (code: string) => zones.find((x) => x.code === code);
-  const docks = byZone("DK");
-  const recv = byZone("R");
-  const ship = byZone("S");
-  const bulk = byZone("C");
+  // Layout is driven by zone type, so zones an administrator creates appear automatically.
+  const docks = zones.filter((z) => z.type === "dock").flatMap((z) => byZone(z.code));
+  const staging = zones.filter((z) => z.type === "staging");
+  const recvZone = staging.find((z) => z.code === "R" || /receiv/i.test(z.name)) ?? staging[0];
+  const shipZone = staging.find((z) => z !== recvZone && (z.code === "S" || /ship/i.test(z.name))) ?? staging.find((z) => z !== recvZone);
+  const recv = recvZone ? byZone(recvZone.code) : [];
+  const ship = shipZone ? byZone(shipZone.code) : [];
+  const rackZones = zones.filter((z) => (z.type === "pick-bin" || z.type === "pallet" || z.type === "cold") && byZone(z.code).length);
+  const laneZones = zones.filter((z) => (z.type === "bulk" || (z.type === "staging" && z !== recvZone && z !== shipZone)) && byZone(z.code).length);
 
   const Staging = ({ code, title }: { code: string; title: string }) => {
     const ls = code === "R" ? recv : ship;
@@ -152,6 +163,7 @@ export function WarehouseMap({ locations, zones, onSelect, highlight }: { locati
   return (
     <div className="space-y-3">
       {/* Dock doors */}
+      {docks.length > 0 && (
       <div className="flex items-center gap-2">
         <span className="w-16 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Docks</span>
         <div className="flex flex-1 gap-1.5">
@@ -172,31 +184,36 @@ export function WarehouseMap({ locations, zones, onSelect, highlight }: { locati
           ))}
         </div>
       </div>
+      )}
 
       <div className="grid grid-cols-[72px_1fr_72px] gap-3">
-        {recv.length ? <Staging code="R" title="Receiving" /> : <div />}
+        {recv.length ? <Staging code="R" title={recvZone?.name ?? "Receiving"} /> : <div />}
         <div className="space-y-3">
           <div className="grid gap-3 xl:grid-cols-2">
-            {z("A") && <RackZone zone={z("A")!} locs={byZone("A")} onSelect={onSelect} highlight={highlight} />}
-            <div className="space-y-3">
-              {z("B") && <RackZone zone={z("B")!} locs={byZone("B")} onSelect={onSelect} highlight={highlight} />}
-              {z("D") && <RackZone zone={z("D")!} locs={byZone("D")} onSelect={onSelect} highlight={highlight} />}
-            </div>
+            {rackZones.map((z) => (
+              <RackZone key={z.id} zone={z} locs={byZone(z.code)} onSelect={onSelect} highlight={highlight} />
+            ))}
           </div>
-          {z("C") && (
-            <div className="rounded-md border bg-subtle/60 p-3">
-              <ZoneLabel zone={z("C")!} pct={(bulk.reduce((s, l) => s + l.occupied, 0) / (bulk.reduce((s, l) => s + l.capacity, 0) || 1)) * 100} count={bulk.length} />
-              <div className="flex gap-1.5">
-                {bulk.map((l) => (
-                  <Cell key={l.id} l={l} onSelect={onSelect} highlight={highlight} className="flex h-10 flex-1 items-end justify-center pb-1">
-                    <span className={cn("font-mono text-[10px]", cellText(l))}>L{l.rack}</span>
-                  </Cell>
-                ))}
+          {laneZones.map((z) => {
+            const lanes = byZone(z.code);
+            return (
+              <div key={z.id} className="rounded-md border bg-subtle/60 p-3">
+                <ZoneLabel zone={z} pct={(lanes.reduce((s, l) => s + l.occupied, 0) / (lanes.reduce((s, l) => s + l.capacity, 0) || 1)) * 100} count={lanes.length} />
+                <div className="flex flex-wrap gap-1.5">
+                  {lanes.map((l) => (
+                    <Cell key={l.id} l={l} onSelect={onSelect} highlight={highlight} className="flex h-10 min-w-12 flex-1 items-end justify-center pb-1">
+                      <span className={cn("font-mono text-[10px]", cellText(l))}>{l.code.split("-").slice(2).join("-")}</span>
+                    </Cell>
+                  ))}
+                </div>
               </div>
-            </div>
+            );
+          })}
+          {rackZones.length + laneZones.length === 0 && (
+            <div className="rounded-md border border-dashed p-8 text-center text-xs text-muted-foreground">No storage zones yet. Use “Add locations” to build the layout.</div>
           )}
         </div>
-        {ship.length ? <Staging code="S" title="Shipping" /> : <div />}
+        {ship.length ? <Staging code="S" title={shipZone?.name ?? "Shipping"} /> : <div />}
       </div>
     </div>
   );

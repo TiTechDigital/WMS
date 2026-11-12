@@ -9,9 +9,9 @@ import { Input, Textarea } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field } from "@/components/shared/form-field";
 import { SkuPicker } from "@/components/shared/sku-picker";
-import { useWms, nowIso } from "@/store/wms-store";
+import { useWms } from "@/store/wms-store";
 import { formatCurrency } from "@/lib/format";
-import { REFERENCE_NOW } from "@/lib/constants";
+import { currentTime } from "@/lib/constants";
 import type { Order, Priority, Product } from "@/types";
 
 type Line = { product?: Product; qty: string };
@@ -25,7 +25,8 @@ const SERVICES: [string, string][] = [
 ];
 
 export function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
-  const { customers, products, inventory, warehouse, orders, actions } = useWms();
+  const { customers, products, inventory, warehouse, actions } = useWms();
+  const [saving, setSaving] = React.useState(false);
   const [customerId, setCustomerId] = React.useState("");
   const [priority, setPriority] = React.useState<Priority>("normal");
   const [service, setService] = React.useState("0");
@@ -52,7 +53,7 @@ export function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenCh
 
   const total = lines.reduce((s, l) => s + (l.product ? l.product.unitPrice * (Number(l.qty) || 0) : 0), 0);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const valid = lines.filter((l) => l.product && Number(l.qty) > 0);
     if (!customerId) return setError("Select a customer.");
@@ -61,31 +62,18 @@ export function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenCh
     if (short) return setError(`Only ${stocked.avail.get(short.product!.id)} units of ${short.product!.sku} available.`);
     const c = customers.find((x) => x.id === customerId)!;
     const [carrier, svc] = SERVICES[Number(service)];
-    const maxId = Math.max(...orders.map((o) => Number(o.id.replace("SO-", "")) || 0));
-    const hours = priority === "urgent" ? 8 : priority === "high" ? 20 : 44;
-    const o: Order = {
-      id: `SO-${maxId + 3}`,
-      warehouseId: warehouse.id,
+    setSaving(true);
+    const res = await actions.createOrder({
       customerId: c.id,
-      customerName: c.name,
-      channel: "Manual",
-      createdAt: nowIso(),
-      requestedShipAt: new Date(REFERENCE_NOW.getTime() + hours * 3600000).toISOString(),
       priority,
-      status: "new",
-      shippingAddress: c.address,
       carrier,
       service: svc,
-      lines: valid.map((l) => {
-        const loc = inventory.find((r) => r.productId === l.product!.id && r.available > 0)?.locationCode ?? "";
-        return { productId: l.product!.id, sku: l.product!.sku, productName: l.product!.name, locationCode: loc, quantity: Number(l.qty), picked: 0, packed: 0, unitPrice: l.product!.unitPrice };
-      }),
-      weightKg: Number(valid.reduce((s, l) => s + l.product!.weightKg * Number(l.qty), 0).toFixed(1)),
-      cartons: Math.max(1, Math.ceil(valid.reduce((s, l) => s + l.product!.weightKg * Number(l.qty), 0) / 18)),
       notes: notes.trim() || undefined,
-    };
-    actions.createOrder(o);
-    toast.success(`${o.id} created`, { description: `${c.name} · ${valid.length} lines · ${formatCurrency(total)}` });
+      lines: valid.map((l) => ({ productId: l.product!.id, quantity: Number(l.qty) })),
+    });
+    setSaving(false);
+    if (!res) return;
+    toast.success(`${res.id} created`, { description: `${c.name} · ${valid.length} lines · ${formatCurrency(total)}` });
     onOpenChange(false);
   };
 
@@ -177,7 +165,7 @@ export function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit">Create order</Button>
+            <Button type="submit" disabled={saving}>{saving ? "Creating…" : "Create order"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -1,6 +1,6 @@
 import type { InventoryRecord, Location, LocationType, Product, StockStatus, Zone } from "@/types";
 import type { WarehouseId } from "@/lib/constants";
-import { REFERENCE_NOW, WAREHOUSES } from "@/lib/constants";
+import { currentTime, WAREHOUSES } from "@/lib/constants";
 import { createRng, type Rng } from "@/lib/random";
 
 type ZoneSpec = { code: string; name: string; type: LocationType; aisles: number; racks: number; levels: number; temperature?: string };
@@ -81,7 +81,7 @@ function buildLocations(wh: WarehouseId, rng: Rng): Location[] {
             occupied: 0,
             status: "active",
             productIds: [],
-            lastCountedAt: new Date(REFERENCE_NOW.getTime() - rng.int(1, 90) * 86400000).toISOString(),
+            lastCountedAt: new Date(currentTime().getTime() - rng.int(1, 90) * 86400000).toISOString(),
           });
         }
       }
@@ -173,7 +173,7 @@ export function generateWarehouseStock(products: Product[]) {
         loc.productIds.push(p.id);
         const reserved = qty > 0 && i === 0 ? Math.min(qty, Math.round(qty * rng.float(0, 0.32))) : 0;
         const perishable = p.category === "Food & Beverage" || p.category === "Health & Beauty";
-        const updated = new Date(REFERENCE_NOW.getTime() - rng.int(5, 60 * 24 * 9) * 60000);
+        const updated = new Date(currentTime().getTime() - rng.int(5, 60 * 24 * 9) * 60000);
         invSeq++;
         inventory.push({
           id: `inv_${wh.id.slice(3)}_${invSeq}`,
@@ -185,7 +185,7 @@ export function generateWarehouseStock(products: Product[]) {
           locationId: loc.id,
           locationCode: loc.code,
           lot: `L26${p2(rng.int(20, 44))}-${rng.int(1000, 9999)}`,
-          expiresAt: perishable ? new Date(REFERENCE_NOW.getTime() + rng.int(isCold(p) ? 4 : 30, isCold(p) ? 40 : 540) * 86400000).toISOString() : undefined,
+          expiresAt: perishable ? new Date(currentTime().getTime() + rng.int(isCold(p) ? 4 : 30, isCold(p) ? 40 : 540) * 86400000).toISOString() : undefined,
           available: qty - reserved,
           reserved,
           total: qty,

@@ -2,7 +2,7 @@
 
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import * as React from "react";
-import { AXIS, ChartTooltip, GRID, SERIES } from "./chart-kit";
+import { AXIS, ChartEmpty, ChartTooltip, GRID, SERIES } from "./chart-kit";
 import { shortDay } from "@/lib/metrics";
 
 /** Single-series trend (area). One measure per chart — never dual axes. */
@@ -26,6 +26,7 @@ export function TrendChart<T extends { date: string }>({
   height?: number;
 }) {
   const id = React.useId().replace(/:/g, "");
+  if (!data.length) return <ChartEmpty height={height} />;
   const values = data.map((d) => Number(d[dataKey]));
   const summary = values.length
     ? `${name} trend from ${shortDay(data[0].date)} to ${shortDay(data[data.length - 1].date)}: latest ${format(values[values.length - 1])}, low ${format(Math.min(...values))}, high ${format(Math.max(...values))}.`

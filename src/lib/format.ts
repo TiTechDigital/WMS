@@ -1,4 +1,4 @@
-import { REFERENCE_NOW } from "@/lib/constants";
+import { currentTime } from "@/lib/constants";
 
 const nf = new Intl.NumberFormat("en-US");
 const nfCompact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
@@ -34,7 +34,7 @@ export function formatTime(iso: string) {
   const d = new Date(iso);
   return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
 }
-export function formatRelative(iso: string, now: Date = REFERENCE_NOW) {
+export function formatRelative(iso: string, now: Date = currentTime()) {
   const diff = now.getTime() - new Date(iso).getTime();
   const abs = Math.abs(diff);
   const future = diff < 0;

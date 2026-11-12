@@ -16,7 +16,7 @@ import { formatDate, formatNumber } from "@/lib/format";
 import type { Location } from "@/types";
 
 export function LocationDrawer({ location, onOpenChange }: { location: Location | null; onOpenChange: (v: boolean) => void }) {
-  const { inventory, warehouse, zones, actions } = useWms();
+  const { inventory, warehouse, zones, actions, can } = useWms();
   const items = location ? inventory.filter((r) => r.locationCode === location.code) : [];
   const zone = zones.find((z) => z.code === location?.zone);
   const pct = location && location.capacity ? (location.occupied / location.capacity) * 100 : 0;
@@ -32,9 +32,10 @@ export function LocationDrawer({ location, onOpenChange }: { location: Location 
       ]
     : [];
 
-  const setStatus = (s: Location["status"]) => {
+  const canStatus = can("locations.status");
+  const setStatus = async (s: Location["status"]) => {
     if (!location) return;
-    actions.setLocationStatus(location.id, s);
+    if (!(await actions.setLocationStatus(location.id, s))) return;
     toast.success(`${location.code} set to ${LOCATION_STATUS[s].label.toLowerCase()}`);
   };
 
@@ -115,17 +116,17 @@ export function LocationDrawer({ location, onOpenChange }: { location: Location 
                 <ClipboardCheck /> Count
               </Button>
               <div className="flex gap-2">
-                {location.status !== "active" && (
+                {canStatus && location.status !== "active" && (
                   <Button variant="secondary" onClick={() => setStatus("active")}>
                     <CheckCircle2 /> Activate
                   </Button>
                 )}
-                {location.status !== "maintenance" && (
+                {canStatus && location.status !== "maintenance" && (
                   <Button variant="secondary" onClick={() => setStatus("maintenance")}>
                     <Wrench /> Maintenance
                   </Button>
                 )}
-                {location.status !== "blocked" && (
+                {canStatus && location.status !== "blocked" && (
                   <Button variant="danger" onClick={() => setStatus("blocked")}>
                     <Ban /> Block
                   </Button>

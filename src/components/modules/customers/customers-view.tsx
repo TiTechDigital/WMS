@@ -32,7 +32,7 @@ const TYPES: CustomerType[] = ["Retail", "Wholesale", "E-commerce", "Distributor
 type Row = Customer & { openOrders: number; location: string };
 
 export function CustomersView() {
-  const { customers, all, actions } = useWms();
+  const { customers, all, actions, can } = useWms();
   const [openId, setOpenId] = React.useState<string | null>(null);
   const [addOpen, setAddOpen] = React.useState(false);
   const rows = React.useMemo<Row[]>(
@@ -58,7 +58,7 @@ export function CustomersView() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Customers" description="Accounts, SLA tiers and ship-to data" actions={<Button onClick={() => setAddOpen(true)}><Plus /> Add customer</Button>} />
+      <PageHeader title="Customers" description="Accounts, SLA tiers and ship-to data" actions={can("partners.manage") && <Button onClick={() => setAddOpen(true)}><Plus /> Add customer</Button>} />
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border bg-border shadow-card md:grid-cols-4">
         {[
           ["Active accounts", `${customers.filter((c) => c.status === "active").length}`],
@@ -131,10 +131,12 @@ export function CustomersView() {
                 <div className="flex gap-2">
                   <Button
                     variant="secondary"
-                    onClick={() => {
+                    disabled={!can("partners.manage")}
+                    title={can("partners.manage") ? undefined : "Requires warehouse manager or above"}
+                    onClick={async () => {
+                      const { openOrders: _o, location: _l, ...customer } = sel;
                       const status = sel.status === "credit_hold" ? "active" : "credit_hold";
-                      actions.upsertCustomer({ ...sel, status });
-                      toast.success(status === "credit_hold" ? `${sel.name} placed on credit hold` : `Credit hold released`);
+                      if (await actions.upsertCustomer({ ...customer, status }, false)) toast.success(status === "credit_hold" ? `${sel.name} placed on credit hold` : `Credit hold released`);
                     }}
                   >
                     {sel.status === "credit_hold" ? "Release credit hold" : "Credit hold"}
@@ -163,7 +165,7 @@ function AddCustomerDialog({ open, onOpenChange }: { open: boolean; onOpenChange
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!f.name.trim() || !f.contactName.trim()) return setError("Company and contact name are required.");
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email)) return setError("Enter a valid email address.");
@@ -183,8 +185,9 @@ function AddCustomerDialog({ open, onOpenChange }: { open: boolean; onOpenChange
       onTimeDelivery: 100,
       status: "active",
     };
-    actions.upsertCustomer(c);
-    toast.success(`${c.name} added`, { description: c.code });
+    const res = await actions.upsertCustomer(c, true);
+    if (!res) return;
+    toast.success(`${c.name} added`);
     onOpenChange(false);
   };
   return (

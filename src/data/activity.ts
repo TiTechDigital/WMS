@@ -9,7 +9,7 @@ import type {
   StockAdjustment,
   StockTransfer,
 } from "@/types";
-import { REFERENCE_NOW, WAREHOUSES, type WarehouseId } from "@/lib/constants";
+import { currentTime, WAREHOUSES, type WarehouseId } from "@/lib/constants";
 import { createRng } from "@/lib/random";
 import { toISODate } from "@/lib/format";
 
@@ -33,7 +33,7 @@ export function generateActivity(input: {
       return pool.length ? rng.pick(pool) : staff[0];
     };
     const push = (e: Omit<ActivityEvent, "id" | "warehouseId">) => events.push({ ...e, id: `evt_${++seq}`, warehouseId: wh.id });
-    const recentTs = (maxMin: number) => new Date(REFERENCE_NOW.getTime() - rng.int(1, maxMin) * MIN).toISOString();
+    const recentTs = (maxMin: number) => new Date(currentTime().getTime() - rng.int(1, maxMin) * MIN).toISOString();
 
     input.orders
       .filter((o) => o.warehouseId === wh.id)
@@ -128,7 +128,7 @@ export function generateActivity(input: {
       push({ timestamp: recentTs(60 * 40), actor: isSystem ? "System" : e.name, actorRole: isSystem ? "System" : e.role, module, action, entity, details, severity, source: isSystem ? "System" : "Web" });
     });
   });
-  return events.filter((e) => e.timestamp <= REFERENCE_NOW.toISOString()).sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  return events.filter((e) => e.timestamp <= currentTime().toISOString()).sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 }
 
 /** Daily operational metrics for the past `days` days, per warehouse. */
@@ -140,7 +140,7 @@ export function generateMetrics(days = 180): Record<WarehouseId, DailyMetric[]> 
     let soh = Math.round(118000 * scale);
     const list: DailyMetric[] = [];
     for (let d = days - 1; d >= 0; d--) {
-      const date = new Date(Date.UTC(REFERENCE_NOW.getUTCFullYear(), REFERENCE_NOW.getUTCMonth(), REFERENCE_NOW.getUTCDate() - d));
+      const date = new Date(Date.UTC(currentTime().getUTCFullYear(), currentTime().getUTCMonth(), currentTime().getUTCDate() - d));
       const dow = date.getUTCDay();
       const weekend = dow === 0 || dow === 6;
       const season = 1 + 0.18 * Math.sin(((days - d) / days) * Math.PI * 1.4) + (days - d) / days / 6;
@@ -171,7 +171,7 @@ export function generateMetrics(days = 180): Record<WarehouseId, DailyMetric[]> 
 }
 
 export function generateNotifications(): AppNotification[] {
-  const t = (min: number) => new Date(REFERENCE_NOW.getTime() - min * MIN).toISOString();
+  const t = (min: number) => new Date(currentTime().getTime() - min * MIN).toISOString();
   return [
     { id: "ntf_1", title: "Stock-out: Li-Ion Battery 5.0Ah", body: "Pick face ATL-A-02-04-B-01 reached zero. 6 open order lines affected.", timestamp: t(4), kind: "alert", read: false, href: "/inventory?status=out_of_stock" },
     { id: "ntf_2", title: "Trailer arrived at DOCK-03", body: "Packwell Packaging Co. · 14 pallets ready for receiving.", timestamp: t(18), kind: "inbound", read: false, href: "/inbound" },

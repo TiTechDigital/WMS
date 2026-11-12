@@ -33,10 +33,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { NAVIGATION } from "@/lib/navigation";
-import { CURRENT_USER, useWms } from "@/store/wms-store";
+import { useWms } from "@/store/wms-store";
 import { NotificationsPanel } from "./notifications";
 import { formatTime } from "@/lib/format";
-import { REFERENCE_NOW } from "@/lib/constants";
 
 function useCrumbs() {
   const pathname = usePathname();
@@ -60,18 +59,18 @@ export function Topbar({
 }) {
   const crumbs = useCrumbs();
   const router = useRouter();
-  const { warehouse } = useWms();
+  const { warehouse, user, roleLabel, syncedAt, can } = useWms();
 
   return (
     <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b bg-surface/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-surface/85 lg:px-6">
       <Button variant="ghost" size="icon" className="lg:hidden" onClick={onOpenMobileNav} aria-label="Open navigation">
         <Menu />
       </Button>
-      <nav className="hidden min-w-0 items-center gap-1.5 text-[13px] md:flex" aria-label="Breadcrumb">
-        <span className="text-muted-foreground">{warehouse.name}</span>
-        <ChevronRight className="size-3.5 text-muted-foreground" />
-        <span className="text-muted-foreground">{crumbs.section}</span>
-        <ChevronRight className="size-3.5 text-muted-foreground" />
+      <nav className="hidden min-w-0 items-center gap-1.5 whitespace-nowrap text-[13px] md:flex" aria-label="Breadcrumb">
+        <span className="hidden truncate text-muted-foreground 2xl:inline">{warehouse.name}</span>
+        <ChevronRight className="hidden size-3.5 shrink-0 text-muted-foreground 2xl:block" aria-hidden />
+        <span className="hidden truncate text-muted-foreground xl:inline">{crumbs.section}</span>
+        <ChevronRight className="hidden size-3.5 shrink-0 text-muted-foreground xl:block" aria-hidden />
         <span className="truncate font-medium">{crumbs.title}</span>
       </nav>
 
@@ -96,30 +95,38 @@ export function Topbar({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>Quick create</DropdownMenuLabel>
-            <DropdownMenuItem onSelect={() => router.push("/orders?new=1")}>
-              <ClipboardList /> Sales order
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => router.push("/inbound?new=1")}>
-              <PackageOpen /> Inbound ASN
-            </DropdownMenuItem>
+            {can("orders.manage") && (
+              <DropdownMenuItem onSelect={() => router.push("/orders?new=1")}>
+                <ClipboardList /> Sales order
+              </DropdownMenuItem>
+            )}
+            {can("inbound.plan") && (
+              <DropdownMenuItem onSelect={() => router.push("/inbound?new=1")}>
+                <PackageOpen /> Inbound ASN
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onSelect={() => router.push("/transfers?new=1")}>
               <ArrowLeftRight /> Stock transfer
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => router.push("/adjustments?new=1")}>
               <SlidersHorizontal /> Stock adjustment
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => router.push("/products?new=1")}>
-              <PackagePlus /> Product / SKU
-            </DropdownMenuItem>
+            {can("products.manage") && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => router.push("/products?new=1")}>
+                  <PackagePlus /> Product / SKU
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 
         <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
 
-        <div className="hidden items-center gap-1.5 rounded-md px-2 text-2xs text-muted-foreground xl:flex" title="Real-time sync with RF devices. All times in the app are shown in UTC.">
+        <div className="hidden items-center gap-1.5 whitespace-nowrap rounded-md px-2 text-2xs text-muted-foreground 2xl:flex" title="Real-time sync with RF devices. All times in the app are shown in UTC.">
           <Wifi className="size-3.5 text-success-text" />
-          <span>Synced {formatTime(REFERENCE_NOW.toISOString())} · times in UTC</span>
+          <span>{syncedAt ? `Synced ${formatTime(syncedAt)}` : "Connecting…"} · times in UTC</span>
         </div>
 
         <Button variant="ghost" size="icon" onClick={onOpenShortcuts} aria-label="Keyboard shortcuts" className="hidden sm:inline-flex">
@@ -130,19 +137,19 @@ export function Topbar({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="ml-1 flex items-center gap-2 rounded-md p-1 pr-1.5 transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
-              <Avatar name={CURRENT_USER.name} size="sm" />
-              <span className="hidden text-left leading-tight xl:block">
-                <span className="block text-xs font-medium">{CURRENT_USER.name}</span>
-                <span className="block text-2xs text-muted-foreground">{CURRENT_USER.role}</span>
+              <Avatar name={user?.name ?? "?"} size="sm" />
+              <span className="hidden max-w-[160px] whitespace-nowrap text-left leading-tight xl:block [&>span]:truncate">
+                <span className="block text-xs font-medium">{user?.name}</span>
+                <span className="block text-2xs text-muted-foreground">{roleLabel}</span>
               </span>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-60">
             <div className="flex items-center gap-2.5 px-2 py-2">
-              <Avatar name={CURRENT_USER.name} />
+              <Avatar name={user?.name ?? "?"} />
               <div className="min-w-0">
-                <div className="truncate text-[13px] font-medium">{CURRENT_USER.name}</div>
-                <div className="truncate text-xs text-muted-foreground">{CURRENT_USER.email}</div>
+                <div className="truncate text-[13px] font-medium">{user?.name}</div>
+                <div className="truncate text-xs text-muted-foreground">{user?.email}</div>
               </div>
             </div>
             <DropdownMenuSeparator />

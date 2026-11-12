@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Ban, ClipboardCheck, Map as MapIcon, Rows3, Search, X } from "lucide-react";
+import { Ban, ClipboardCheck, Map as MapIcon, Plus, Rows3, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useWms } from "@/store/wms-store";
 import { PageHeader } from "@/components/shared/page-header";
@@ -17,6 +17,7 @@ import { WarehouseMap, MapLegend } from "./warehouse-map";
 import { LocationDrawer } from "./location-drawer";
 import { useInitialParam } from "@/hooks/use-query-flag";
 import { useConfirm } from "@/components/shared/confirm-dialog";
+import { AddLocationsDialog } from "./add-locations-dialog";
 import { LOCATION_STATUS, LOCATION_TYPE_LABEL } from "@/lib/status";
 import { formatDate, formatNumber } from "@/lib/format";
 import type { Location } from "@/types";
@@ -24,7 +25,8 @@ import type { Location } from "@/types";
 type Row = Location & { pct: number; products: string };
 
 export function LocationsView() {
-  const { locations, zones, inventory, warehouse, actions } = useWms();
+  const { locations, zones, inventory, warehouse, actions, can } = useWms();
+  const [addOpen, setAddOpen] = React.useState(false);
   const q = useInitialParam("q");
   const [tab, setTab] = React.useState(q ? "list" : "map");
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
@@ -93,6 +95,12 @@ export function LocationsView() {
         title="Locations & Storage"
         description={`Warehouse → Zone → Aisle → Rack → Shelf → Bin · ${warehouse.name}`}
         actions={
+          <>
+          {can("locations.manage") && (
+            <Button onClick={() => setAddOpen(true)}>
+              <Plus /> Add locations
+            </Button>
+          )}
           <Tabs value={tab} onValueChange={setTab}>
             <TabsList variant="segmented">
               <TabsTrigger value="map">
@@ -103,6 +111,7 @@ export function LocationsView() {
               </TabsTrigger>
             </TabsList>
           </Tabs>
+          </>
         }
       />
 
@@ -191,7 +200,7 @@ export function LocationsView() {
             ]}
             onRowClick={(r) => setSelectedId(r.id)}
             getRowId={(r) => r.id}
-            selectable
+            selectable={can("locations.status")}
             bulkActions={(sel, clear) => (
               <>
                 <Button
@@ -216,9 +225,8 @@ export function LocationsView() {
                       items: sel.map((l) => l.code),
                       confirmLabel: `Block ${sel.length}`,
                       tone: "danger",
-                      onConfirm: () => {
-                        sel.forEach((l) => actions.setLocationStatus(l.id, "blocked"));
-                        toast.success(`${sel.length} locations blocked`);
+                      onConfirm: async () => {
+                        if (await actions.setLocationStatus(sel.map((l) => l.id), "blocked")) toast.success(`${sel.length} locations blocked`);
                         clear();
                       },
                     });
@@ -226,6 +234,31 @@ export function LocationsView() {
                 >
                   <Ban /> Block
                 </Button>
+                {can("locations.manage") && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      const empty = sel.filter((l) => l.occupied === 0 && !l.productIds.length);
+                      const held = sel.length - empty.length;
+                      if (!empty.length) return toast.info("Only empty locations can be deleted", { description: "Move or adjust the stock out first." });
+                      confirm({
+                        title: `Delete ${empty.length} empty location${empty.length === 1 ? "" : "s"}?`,
+                        description: `They're removed from the layout permanently.${held ? ` ${held} selected location${held === 1 ? " holds" : "s hold"} stock and will be kept.` : ""}`,
+                        items: empty.map((l) => l.code),
+                        confirmLabel: `Delete ${empty.length}`,
+                        tone: "danger",
+                        onConfirm: async () => {
+                          const r = await actions.deleteLocations(empty.map((l) => l.id));
+                          if (r) toast.success(`${r.deleted} location${r.deleted === 1 ? "" : "s"} deleted`, { description: r.blocked.length ? `${r.blocked.length} kept because they hold stock` : undefined });
+                          clear();
+                        },
+                      });
+                    }}
+                  >
+                    <Trash2 /> Delete
+                  </Button>
+                )}
               </>
             )}
             exportName={`locations-${warehouse.id}`}
@@ -235,6 +268,7 @@ export function LocationsView() {
       </Tabs>
 
       <LocationDrawer location={selected} onOpenChange={(o) => !o && setSelectedId(null)} />
+      <AddLocationsDialog open={addOpen} onOpenChange={setAddOpen} />
       {dialog}
     </div>
   );

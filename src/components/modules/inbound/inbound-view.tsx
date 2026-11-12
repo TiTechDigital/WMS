@@ -19,7 +19,7 @@ import { NEXT_ACTION, shipmentTotals } from "./inbound-shared";
 import { useQueryFlag } from "@/hooks/use-query-flag";
 import { INBOUND_STATUS, PRIORITY } from "@/lib/status";
 import { formatDateTime, formatNumber, formatRelative } from "@/lib/format";
-import { REFERENCE_NOW } from "@/lib/constants";
+import { currentTime } from "@/lib/constants";
 import { INBOUND_STAGES, type InboundShipment, type InboundStatus } from "@/types";
 
 const STAGE_ICONS: Record<InboundStatus, React.ElementType> = {
@@ -34,7 +34,7 @@ const STAGE_ICONS: Record<InboundStatus, React.ElementType> = {
 type Row = InboundShipment & { units: number; received: number; variance: number; damaged: number; counted: boolean };
 
 export function InboundView() {
-  const { inbound, warehouse, actions } = useWms();
+  const { inbound, warehouse, actions, can } = useWms();
   const [openId, setOpenId] = React.useState<string | null>(null);
   const [stage, setStage] = React.useState<string | null>(null);
   const [window_, setWindow] = React.useState<"open" | "today" | "week" | "all">("open");
@@ -45,8 +45,8 @@ export function InboundView() {
   useQueryFlag("sku", (sku) => setPresetSku(sku));
   useQueryFlag("new", () => setNewOpen(true));
 
-  const today = REFERENCE_NOW.toISOString().slice(0, 10);
-  const weekEnd = new Date(REFERENCE_NOW.getTime() + 7 * 86400000).toISOString();
+  const today = currentTime().toISOString().slice(0, 10);
+  const weekEnd = new Date(currentTime().getTime() + 7 * 86400000).toISOString();
 
   const rows = React.useMemo<Row[]>(
     () =>
@@ -68,8 +68,8 @@ export function InboundView() {
     return { key: k, label: INBOUND_STATUS[k].label, count: items.length, hint: `${formatNumber(units)} units`, icon: STAGE_ICONS[k] };
   });
 
-  const advance = (s: Row) => {
-    const next = actions.advanceInbound(s.id);
+  const advance = async (s: Row) => {
+    const next = await actions.advanceInbound(s.id);
     if (next) toast.success(`${s.id} → ${INBOUND_STATUS[next].label}`, { description: next === "completed" ? "Stock posted to inventory" : s.supplierName });
   };
 
@@ -104,7 +104,7 @@ export function InboundView() {
       header: "Arrival",
       meta: { label: "Arrival" },
       cell: ({ row }) => {
-        const late = row.original.status === "expected" && row.original.expectedAt < REFERENCE_NOW.toISOString();
+        const late = row.original.status === "expected" && row.original.expectedAt < currentTime().toISOString();
         return (
           <div>
             <div className="tabular">{formatDateTime(row.original.arrivedAt ?? row.original.expectedAt)}</div>
@@ -179,14 +179,16 @@ export function InboundView() {
         title="Inbound Operations"
         description={`Receiving, quality control and putaway at ${warehouse.name}`}
         actions={
-          <Button
-            onClick={() => {
-              setPresetSku(undefined);
-              setNewOpen(true);
-            }}
-          >
-            <Plus /> New ASN
-          </Button>
+          can("inbound.plan") && (
+            <Button
+              onClick={() => {
+                setPresetSku(undefined);
+                setNewOpen(true);
+              }}
+            >
+              <Plus /> New ASN
+            </Button>
+          )
         }
       />
 

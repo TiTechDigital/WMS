@@ -1,6 +1,6 @@
 import type { Employee, EmployeeRole } from "@/types";
 import { createRng } from "@/lib/random";
-import { REFERENCE_NOW, WAREHOUSES } from "@/lib/constants";
+import { currentTime, WAREHOUSES } from "@/lib/constants";
 
 const NAMES = [
   "Marcus Reed", "Ana Gutierrez", "Tyrone Banks", "Emily Novak", "Jamal Carter", "Sofia Petrova", "Luis Hernandez",
@@ -69,7 +69,7 @@ export function generateEmployees(): Employee[] {
         tasksToday: status === "on_shift" || status === "on_break" ? (isFloor ? rng.int(6, 38) : rng.int(2, 12)) : 0,
         certifications: rng.shuffle(CERTS[role]).slice(0, rng.int(1, 3)),
         device: isFloor ? `RF-${rng.int(100, 299)}` : undefined,
-        hiredAt: new Date(REFERENCE_NOW.getTime() - rng.int(40, 2900) * 86400000).toISOString(),
+        hiredAt: new Date(currentTime().getTime() - rng.int(40, 2900) * 86400000).toISOString(),
       });
       n++;
     }

@@ -19,7 +19,7 @@ import type { PickTask } from "@/types";
  * scan input so it can be lifted into a handheld/mobile client unchanged.
  */
 export function PickConsole({ task }: { task: PickTask }) {
-  const { actions, employees, products } = useWms();
+  const { actions, employees, products, can } = useWms();
   const firstOpen = Math.max(0, task.lines.findIndex((l) => l.picked < l.quantity));
   const [idx, setIdx] = React.useState(firstOpen);
   const [locOk, setLocOk] = React.useState(false);
@@ -51,15 +51,19 @@ export function PickConsole({ task }: { task: PickTask }) {
     setTimeout(() => setFlash(null), 450);
   };
 
-  const ensureStarted = () => {
-    if (task.status === "queued" || task.status === "paused") actions.setTaskStatus(task.id, "in_progress");
-  };
+  const [busy, setBusy] = React.useState(false);
 
-  const confirm = (amount: number) => {
-    if (!line) return;
-    ensureStarted();
+  const confirm = async (amount: number) => {
+    if (!line || busy) return;
     const newPicked = Math.min(line.quantity, line.picked + amount);
-    const { completed } = actions.confirmPick(task.id, idx, newPicked);
+    setBusy(true);
+    const res = await actions.confirmPick(task.id, idx, newPicked);
+    setBusy(false);
+    if (!res) {
+      pulse("err");
+      return;
+    }
+    const { completed } = res;
     pulse("ok");
     if (completed) {
       toast.success(`${task.id} complete`, { description: `${task.orderId} released to packing` });
@@ -111,7 +115,11 @@ export function PickConsole({ task }: { task: PickTask }) {
           <div className="flex items-center gap-1.5">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 rounded-md border border-sidebar-border px-2 py-1 text-xs text-sidebar-foreground hover:bg-sidebar-accent">
+                <button
+                  disabled={!can("orders.manage")}
+                  title={can("orders.manage") ? "Assign picker" : "Assignment is done by supervisors"}
+                  className="flex items-center gap-2 rounded-md border border-sidebar-border px-2 py-1 text-xs text-sidebar-foreground hover:bg-sidebar-accent disabled:cursor-default disabled:hover:bg-transparent"
+                >
                   {task.assigneeName ? <Avatar name={task.assigneeName} size="xs" /> : <UserPlus className="size-3.5" />}
                   {task.assigneeName ?? "Assign"}
                 </button>
@@ -121,9 +129,8 @@ export function PickConsole({ task }: { task: PickTask }) {
                 {pickers.map((p) => (
                   <DropdownMenuItem
                     key={p.id}
-                    onSelect={() => {
-                      actions.assignTask(task.id, p);
-                      toast.success(`${task.id} assigned to ${p.name}`);
+                    onSelect={async () => {
+                      if (await actions.assignTask(task.id, p.id)) toast.success(`${task.id} assigned to ${p.name}`);
                     }}
                   >
                     <Avatar name={p.name} size="xs" />
@@ -236,7 +243,7 @@ export function PickConsole({ task }: { task: PickTask }) {
                   <Plus />
                 </Button>
               </div>
-              <Button size="xl" className="flex-1" disabled={line.picked >= line.quantity} onClick={() => confirm(qty)}>
+              <Button size="xl" className="flex-1" disabled={line.picked >= line.quantity || busy} onClick={() => confirm(qty)}>
                 <Check /> Confirm {qty}
               </Button>
             </div>

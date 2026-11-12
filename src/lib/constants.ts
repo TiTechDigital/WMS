@@ -1,14 +1,17 @@
-/**
- * Reference "now" for the mock dataset. All sample timestamps are generated relative
- * to this instant so that server and client renders are identical. When a real API is
- * connected, replace usages with `new Date()`.
- */
-export const REFERENCE_NOW = new Date("2026-11-06T14:30:00Z");
+/** Current time. Centralised so tests and the seed script can reason about "now" in one place. */
+export function currentTime() {
+  return new Date();
+}
 
+/**
+ * Sites created by the seed script. At runtime the list of warehouses comes from the
+ * database (`useWms().warehouses`); this constant is only used to generate demo data.
+ */
 export const WAREHOUSES = [
   { id: "WH-ATL", name: "Atlanta DC", city: "Atlanta, GA" },
   { id: "WH-DAL", name: "Dallas Fulfillment", city: "Dallas, TX" },
   { id: "WH-RNO", name: "Reno West Hub", city: "Reno, NV" },
 ] as const;
 
-export type WarehouseId = (typeof WAREHOUSES)[number]["id"];
+/** Warehouse identifiers are database keys (e.g. "WH-ATL"). */
+export type WarehouseId = string;

@@ -1,5 +1,5 @@
 import type { useWms } from "@/store/wms-store";
-import { REFERENCE_NOW } from "@/lib/constants";
+import { currentTime } from "@/lib/constants";
 
 type Store = ReturnType<typeof useWms>;
 export type ReportRow = Record<string, string | number>;
@@ -12,7 +12,7 @@ export interface ReportDef {
   build: (s: Store) => ReportRow[];
 }
 
-const daysSince = (iso: string) => Math.round((REFERENCE_NOW.getTime() - new Date(iso).getTime()) / 86400000);
+const daysSince = (iso: string) => Math.round((currentTime().getTime() - new Date(iso).getTime()) / 86400000);
 
 export const REPORTS: ReportDef[] = [
   {

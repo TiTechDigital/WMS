@@ -1,6 +1,6 @@
 import type { Category, Product, StorageCondition, UnitOfMeasure } from "@/types";
 import { createRng } from "@/lib/random";
-import { REFERENCE_NOW } from "@/lib/constants";
+import { currentTime } from "@/lib/constants";
 
 type Template = {
   name: string;
@@ -157,8 +157,8 @@ export function generateProducts(supplierIdsByCategory: Record<Category, string[
         ]);
         const minStock = Math.round(rng.int(velocity[0], velocity[1]) / 10) * 10;
         const maxStock = minStock * rng.int(4, 7);
-        const created = new Date(REFERENCE_NOW.getTime() - rng.int(60, 900) * 86400000);
-        const updated = new Date(REFERENCE_NOW.getTime() - rng.int(0, 45) * 86400000 - rng.int(0, 86400000));
+        const created = new Date(currentTime().getTime() - rng.int(60, 900) * 86400000);
+        const updated = new Date(currentTime().getTime() - rng.int(0, 45) * 86400000 - rng.int(0, 86400000));
         const suppliers = supplierIdsByCategory[category];
         products.push({
           id: `prd_${seq}`,

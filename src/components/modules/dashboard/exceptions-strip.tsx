@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { AlertOctagon, Ban, CheckCircle2, Clock, PackageX, SlidersHorizontal, Truck } from "lucide-react";
 import { useWms } from "@/store/wms-store";
-import { REFERENCE_NOW } from "@/lib/constants";
+import { currentTime } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 type Item = {
@@ -23,7 +23,7 @@ type Item = {
  */
 export function ExceptionsStrip() {
   const { orders, inbound, inventory, adjustments, locations } = useWms();
-  const now = REFERENCE_NOW.toISOString();
+  const now = currentTime().toISOString();
 
   const items = React.useMemo<Item[]>(() => {
     const open = orders.filter((o) => ["new", "allocated", "picking", "packing", "ready_to_ship"].includes(o.status));

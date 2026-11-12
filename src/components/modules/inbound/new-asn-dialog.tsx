@@ -11,14 +11,15 @@ import { Field } from "@/components/shared/form-field";
 import { SkuPicker } from "@/components/shared/sku-picker";
 import { useWms } from "@/store/wms-store";
 import type { InboundShipment, Priority, Product } from "@/types";
-import { REFERENCE_NOW } from "@/lib/constants";
+import { currentTime } from "@/lib/constants";
 
 type Line = { product?: Product; qty: string };
 const CARRIERS = ["XPO Logistics", "Old Dominion", "Estes Express", "Saia LTL", "J.B. Hunt", "Maersk Line", "Supplier truck"];
 
 export function NewAsnDialog({ open, onOpenChange, presetSku }: { open: boolean; onOpenChange: (v: boolean) => void; presetSku?: string }) {
-  const { suppliers, products, warehouse, inbound, actions } = useWms();
-  const tomorrow = new Date(REFERENCE_NOW.getTime() + 86400000).toISOString().slice(0, 10);
+  const { suppliers, products, warehouse, actions } = useWms();
+  const [saving, setSaving] = React.useState(false);
+  const tomorrow = new Date(currentTime().getTime() + 86400000).toISOString().slice(0, 10);
   const [supplierId, setSupplierId] = React.useState("");
   const [po, setPo] = React.useState("");
   const [carrier, setCarrier] = React.useState(CARRIERS[0]);
@@ -43,30 +44,25 @@ export function NewAsnDialog({ open, onOpenChange, presetSku }: { open: boolean;
 
   const supplierProducts = supplierId ? products.filter((p) => p.supplierId === supplierId) : products;
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const valid = lines.filter((l) => l.product && Number(l.qty) > 0);
     if (!supplierId) return setError("Select a supplier.");
     if (!po.trim()) return setError("Enter a PO number.");
     if (!valid.length) return setError("Add at least one line with a quantity.");
     const supplier = suppliers.find((s) => s.id === supplierId)!;
-    const maxAsn = Math.max(...inbound.map((s) => Number(s.id.replace("ASN-", "")) || 0), 58000);
-    const asn: InboundShipment = {
-      id: `ASN-${maxAsn + 7}`,
-      warehouseId: warehouse.id,
-      poNumber: po.trim(),
+    setSaving(true);
+    const res = await actions.createInbound({
       supplierId,
-      supplierName: supplier.name,
+      poNumber: po.trim(),
       carrier,
-      trackingNumber: `PRO${Math.floor(10000000 + Math.random() * 89999999)}`,
       expectedAt: new Date(`${date}T${time}:00Z`).toISOString(),
-      status: "expected",
       priority,
-      pallets: Math.max(1, Math.round(valid.reduce((s, l) => s + Number(l.qty), 0) / 180)),
-      lines: valid.map((l) => ({ productId: l.product!.id, sku: l.product!.sku, productName: l.product!.name, expected: Number(l.qty), received: 0, damaged: 0 })),
-    };
-    actions.createInbound(asn);
-    toast.success(`${asn.id} created`, { description: `${supplier.name} · ${valid.length} lines · ETA ${date} ${time}` });
+      lines: valid.map((l) => ({ productId: l.product!.id, expected: Number(l.qty) })),
+    });
+    setSaving(false);
+    if (!res) return;
+    toast.success(`${res.id} created`, { description: `${supplier.name} · ${valid.length} lines · ETA ${date} ${time} UTC` });
     onOpenChange(false);
   };
 
@@ -159,7 +155,7 @@ export function NewAsnDialog({ open, onOpenChange, presetSku }: { open: boolean;
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit">Create ASN</Button>
+            <Button type="submit" disabled={saving}>{saving ? "Creating…" : "Create ASN"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -23,9 +23,12 @@ export function InboundDrawer({ id, onOpenChange }: { id: string | null; onOpenC
   const supplier = suppliers.find((x) => x.id === s?.supplierId);
   const editable = s && (s.status === "arrived" || s.status === "receiving");
 
-  const advance = () => {
+  const [busy, setBusy] = React.useState(false);
+  const advance = async () => {
     if (!s) return;
-    const next = actions.advanceInbound(s.id);
+    setBusy(true);
+    const next = await actions.advanceInbound(s.id);
+    setBusy(false);
     if (next) toast.success(`${s.id} → ${INBOUND_STATUS[next].label}`, { description: next === "completed" ? "Stock posted to inventory" : undefined });
   };
 
@@ -118,14 +121,14 @@ export function InboundDrawer({ id, onOpenChange }: { id: string | null; onOpenC
                               <td className="px-3 py-2 text-right tabular">{formatNumber(l.expected)}</td>
                               <td className="px-3 py-2 text-right">
                                 {editable ? (
-                                  <Input type="number" min={0} className="ml-auto h-7 w-20 text-right" value={l.received} onChange={(e) => actions.updateInboundLine(s.id, l.sku, Math.max(0, Number(e.target.value)), l.damaged)} aria-label={`Received ${l.sku}`} />
+                                  <QtyInput key={`r-${s.id}-${l.sku}-${l.received}`} className="w-20" value={l.received} label={`Received ${l.sku}`} onCommit={(v) => actions.updateInboundLine(s.id, l.sku, v, l.damaged)} />
                                 ) : (
                                   <span className="tabular">{formatNumber(l.received)}</span>
                                 )}
                               </td>
                               <td className="px-3 py-2 text-right">
                                 {editable ? (
-                                  <Input type="number" min={0} className="ml-auto h-7 w-16 text-right" value={l.damaged} onChange={(e) => actions.updateInboundLine(s.id, l.sku, l.received, Math.max(0, Number(e.target.value)))} aria-label={`Damaged ${l.sku}`} />
+                                  <QtyInput key={`d-${s.id}-${l.sku}-${l.damaged}`} className="w-16" value={l.damaged} label={`Damaged ${l.sku}`} onCommit={(v) => actions.updateInboundLine(s.id, l.sku, l.received, v)} />
                                 ) : (
                                   <span className={cn("tabular", l.damaged > 0 && "text-warning-text")}>{l.damaged}</span>
                                 )}
@@ -165,7 +168,7 @@ export function InboundDrawer({ id, onOpenChange }: { id: string | null; onOpenC
                   )}
                 </div>
                 {NEXT_ACTION[s.status] ? (
-                  <Button onClick={advance}>
+                  <Button onClick={advance} disabled={busy}>
                     {NEXT_ACTION[s.status]} <ArrowRight />
                   </Button>
                 ) : (
@@ -177,5 +180,28 @@ export function InboundDrawer({ id, onOpenChange }: { id: string | null; onOpenC
         })()}
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** Number field that saves on blur or Enter (one API call per edit, not per keystroke). */
+function QtyInput({ value, label, className, onCommit }: { value: number; label: string; className?: string; onCommit: (v: number) => unknown }) {
+  const [draft, setDraft] = React.useState(String(value));
+  const commit = () => {
+    const n = Math.max(0, Math.floor(Number(draft)));
+    if (!Number.isFinite(n)) return setDraft(String(value));
+    if (n !== value) void onCommit(n);
+  };
+  return (
+    <Input
+      type="number"
+      min={0}
+      inputMode="numeric"
+      className={cn("ml-auto h-7 text-right", className)}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+      aria-label={label}
+    />
   );
 }

@@ -20,7 +20,7 @@ import { useInitialParam } from "@/hooks/use-query-flag";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { ORDER_STATUS, PRIORITY } from "@/lib/status";
 import { formatDateTime, formatRelative } from "@/lib/format";
-import { REFERENCE_NOW } from "@/lib/constants";
+import { currentTime } from "@/lib/constants";
 import { ORDER_STAGES, type Order, type OrderStatus } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -30,13 +30,14 @@ const CUTOFFS: Record<string, string> = { UPS: "16:30", FedEx: "17:00", USPS: "1
 type Row = Order & { qty: number; picked: number; packed: number };
 
 export function OutboundView() {
-  const { orders, warehouse, actions } = useWms();
+  const { orders, warehouse, actions, can } = useWms();
+  const canManage = can("orders.manage");
   const priorityParam = useInitialParam("priority");
   const [openId, setOpenId] = React.useState<string | null>(null);
   const [stage, setStage] = React.useState<string | null>(null);
   const { confirm, dialog } = useConfirm();
 
-  const dayAgo = new Date(REFERENCE_NOW.getTime() - 86400000).toISOString();
+  const dayAgo = new Date(currentTime().getTime() - 86400000).toISOString();
   const active = React.useMemo<Row[]>(
     () =>
       orders
@@ -55,7 +56,7 @@ export function OutboundView() {
 
   const ready = active.filter((o) => o.status === "ready_to_ship");
   const carriers = Object.keys(CUTOFFS).map((c) => ({ carrier: c, cutoff: CUTOFFS[c], orders: ready.filter((o) => o.carrier === c) }));
-  const late = active.filter((o) => o.status !== "shipped" && o.requestedShipAt < REFERENCE_NOW.toISOString()).length;
+  const late = active.filter((o) => o.status !== "shipped" && o.requestedShipAt < currentTime().toISOString()).length;
 
   const releaseWave = () => {
     const n = active.filter((o) => o.status === "new");
@@ -68,10 +69,9 @@ export function OutboundView() {
       onConfirm: () => doReleaseWave(n),
     });
   };
-  const doReleaseWave = (n: Row[]) => {
-    n.forEach((o) => actions.advanceOrder(o.id));
-    actions.log({ module: "Picking", action: "Wave released", entity: `W-${REFERENCE_NOW.toISOString().slice(5, 10).replace("-", "")}-${String(n.length).padStart(2, "0")}`, details: `${n.length} orders allocated to pick tasks`, severity: "info" });
-    toast.success(`Wave released · ${n.length} orders allocated`, { description: "Pick tasks created in the Picking console" });
+  const doReleaseWave = async (_n: Row[]) => {
+    const r = await actions.releaseWave();
+    if (r) toast.success(`Wave released · ${r.count} orders allocated`, { description: "Pick tasks created in the Picking console" });
   };
 
   const closeManifest = (carrier: string, list: Row[]) =>
@@ -82,8 +82,8 @@ export function OutboundView() {
       confirmLabel: `Ship ${list.length} with ${carrier}`,
       onConfirm: () => doCloseManifest(carrier, list),
     });
-  const doCloseManifest = (carrier: string, list: Row[]) => {
-    list.forEach((o) => actions.setOrderStatus(o.id, "shipped"));
+  const doCloseManifest = async (carrier: string, list: Row[]) => {
+    if (!(await actions.setOrderStatus(list.map((o) => o.id), "shipped"))) return;
     toast.success(`${carrier} manifest closed`, { description: `${list.length} shipment${list.length === 1 ? "" : "s"} handed over` });
   };
 
@@ -177,7 +177,7 @@ export function OutboundView() {
       header: "Ship by",
       meta: { label: "Ship by" },
       cell: ({ row }) => {
-        const isLate = row.original.status !== "shipped" && row.original.requestedShipAt < REFERENCE_NOW.toISOString();
+        const isLate = row.original.status !== "shipped" && row.original.requestedShipAt < currentTime().toISOString();
         return (
           <div>
             <div className="tabular text-xs">{formatDateTime(row.original.requestedShipAt)}</div>
@@ -193,13 +193,13 @@ export function OutboundView() {
       enableHiding: false,
       enableSorting: false,
       cell: ({ row }) =>
-        ORDER_NEXT_ACTION[row.original.status] ? (
+        ORDER_NEXT_ACTION[row.original.status] && canManage ? (
           <Button
             size="sm"
             variant="secondary"
-            onClick={(e) => {
+            onClick={async (e) => {
               e.stopPropagation();
-              const next = actions.advanceOrder(row.original.id);
+              const next = await actions.advanceOrder(row.original.id);
               if (next) toast.success(`${row.original.id} → ${ORDER_STATUS[next as OrderStatus].label}`);
             }}
           >
@@ -217,7 +217,7 @@ export function OutboundView() {
         title="Outbound Operations"
         description={`Fulfilment pipeline for ${warehouse.name} · ${late} shipment${late === 1 ? "" : "s"} past promise date`}
         actions={
-          <Button onClick={releaseWave}>
+          canManage && <Button onClick={releaseWave}>
             <Send /> Release wave ({active.filter((o) => o.status === "new").length})
           </Button>
         }
@@ -257,7 +257,7 @@ export function OutboundView() {
                     Pickup {c.cutoff} · {c.orders.length} ready
                   </div>
                 </div>
-                <Button size="sm" variant="secondary" disabled={!c.orders.length} onClick={() => closeManifest(c.carrier, c.orders)}>
+                <Button size="sm" variant="secondary" disabled={!c.orders.length || !canManage} title={canManage ? undefined : "Requires shift supervisor or above"} onClick={() => closeManifest(c.carrier, c.orders)}>
                   Close manifest
                 </Button>
               </div>
