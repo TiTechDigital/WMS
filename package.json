@@ -14,7 +14,7 @@
     "db:reset": "prisma migrate reset",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
-    "vercel-build": "prisma generate && prisma migrate deploy && next build",
+    "vercel-build": "node scripts/vercel-build.mjs",
     "db:create-admin": "tsx --tsconfig tsconfig.json prisma/create-admin.ts"
   },
   "dependencies": {

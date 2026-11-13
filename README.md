@@ -39,7 +39,7 @@ npm run dev                   # http://localhost:3000
 | Variable | What it is |
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection string used by the app. On hosted providers use the **pooled** URL. |
-| `DIRECT_URL` | Direct (non-pooled) URL used only for migrations. If you have only one URL, use the same value. |
+| `DIRECT_URL` | Optional. Direct (non-pooled) URL used only for migrations. If omitted, `DATABASE_URL` is used. |
 | `AUTH_SECRET` | Signs session cookies. At least 32 random characters: `openssl rand -base64 48`. |
 | `SEED_ADMIN_PASSWORD`, `SEED_USER_PASSWORD` | Only for `npm run db:seed` (demo accounts). |
 
@@ -57,7 +57,7 @@ Operators see only their home site. **Change these passwords** before showing th
 ## 2. Deploy to Vercel
 
 1. Create a PostgreSQL database (e.g. Neon from Vercel → Storage → Marketplace).
-2. In **Vercel → Project → Settings → Environment Variables**, add `DATABASE_URL`, `DIRECT_URL` and `AUTH_SECRET`.
+2. In **Vercel → Project → Settings → Environment Variables**, add `DATABASE_URL` and `AUTH_SECRET` (and `DIRECT_URL` only if your provider gives a separate non-pooled URL).
 3. Deploy. The `vercel-build` script runs `prisma migrate deploy` automatically, so tables are created and kept up to date on every deploy.
 4. Create your first administrator **once**, from your computer, pointing at the production database:
    ```bash
